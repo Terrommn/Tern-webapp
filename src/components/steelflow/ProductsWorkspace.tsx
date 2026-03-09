@@ -2,47 +2,21 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { CreateEntityModal } from "@/components/steelflow/CreateEntityModal";
-import type { ProductRecord, ProductStatus } from "@/types/product";
+import type { MaterialRecord } from "@/types/material";
+import type { OrderRecord } from "@/types/order";
+import type { ProductRecord } from "@/types/product";
 
 type ProductFormState = {
-  sku: string;
-  name: string;
-  category: string;
-  material: string;
-  dimensions: string;
-  unitWeight: string;
-  stockStatus: ProductStatus;
-  stockUnits: string;
-  activeOrders: string;
-  location: string;
-  pricePerTon: string;
-  description: string;
+  gauge: string;
+  thickness: string;
+  material_id: string;
 };
 
-const STATUS_STYLES: Record<ProductStatus, string> = {
-  active:
-    "bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400",
-  low_stock:
-    "bg-amber-500/10 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400",
-  draft:
-    "bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
-};
+function formatDate(value: string | null) {
+  if (!value) {
+    return "N/A";
+  }
 
-const STATUS_LABELS: Record<ProductStatus, string> = {
-  active: "Active",
-  low_stock: "Low stock",
-  draft: "Draft",
-};
-
-function formatMoney(value: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
-function formatDate(value: string) {
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
@@ -50,20 +24,14 @@ function formatDate(value: string) {
   }).format(new Date(value));
 }
 
-function createFormState(product?: ProductRecord): ProductFormState {
+function createFormState(
+  materials: MaterialRecord[],
+  product?: ProductRecord
+): ProductFormState {
   return {
-    sku: product?.sku ?? "",
-    name: product?.name ?? "",
-    category: product?.category ?? "",
-    material: product?.material ?? "",
-    dimensions: product?.dimensions ?? "",
-    unitWeight: product ? String(product.unitWeight) : "",
-    stockStatus: product?.stockStatus ?? "draft",
-    stockUnits: product ? String(product.stockUnits) : "0",
-    activeOrders: product ? String(product.activeOrders) : "0",
-    location: product?.location ?? "",
-    pricePerTon: product ? String(product.pricePerTon) : "",
-    description: product?.description ?? "",
+    gauge: product ? String(product.gauge) : "",
+    thickness: product ? String(product.thickness) : "",
+    material_id: product?.material_id ?? materials[0]?.id ?? "",
   };
 }
 
@@ -71,28 +39,26 @@ function buildProductFromForm(
   form: ProductFormState,
   existing?: ProductRecord
 ): ProductRecord {
+  const now = new Date().toISOString();
+
   return {
-    id: existing?.id ?? `PRD-${Date.now().toString().slice(-6)}`,
-    sku: form.sku.trim(),
-    name: form.name.trim(),
-    category: form.category.trim(),
-    material: form.material.trim(),
-    dimensions: form.dimensions.trim(),
-    unitWeight: Number(form.unitWeight),
-    stockStatus: form.stockStatus,
-    stockUnits: Number(form.stockUnits),
-    activeOrders: Number(form.activeOrders),
-    location: form.location.trim(),
-    pricePerTon: Number(form.pricePerTon),
-    description: form.description.trim(),
-    lastUpdated: new Date().toISOString(),
+    id: existing?.id ?? crypto.randomUUID(),
+    gauge: Number(form.gauge),
+    thickness: Number(form.thickness),
+    material_id: form.material_id,
+    created_at: existing?.created_at ?? now,
+    updated_at: now,
   };
 }
 
 export function ProductsWorkspace({
   initialProducts,
+  materials,
+  orders,
 }: {
   initialProducts: ProductRecord[];
+  materials: MaterialRecord[];
+  orders: OrderRecord[];
 }) {
   const [products, setProducts] = useState(initialProducts);
   const [query, setQuery] = useState("");
@@ -100,11 +66,24 @@ export function ProductsWorkspace({
     initialProducts[0]?.id ?? ""
   );
   const [form, setForm] = useState<ProductFormState>(
-    createFormState(initialProducts[0])
+    createFormState(materials, initialProducts[0])
   );
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [createForm, setCreateForm] = useState<ProductFormState>(
-    createFormState()
+    createFormState(materials)
+  );
+
+  const materialMap = useMemo(
+    () => new Map(materials.map((material) => [material.id, material])),
+    [materials]
+  );
+  const orderCountByProduct = useMemo(
+    () =>
+      orders.reduce<Record<string, number>>((acc, order) => {
+        acc[order.product_id] = (acc[order.product_id] ?? 0) + 1;
+        return acc;
+      }, {}),
+    [orders]
   );
 
   const filteredProducts = useMemo(() => {
@@ -114,43 +93,31 @@ export function ProductsWorkspace({
       return products;
     }
 
-    return products.filter((product) =>
-      [
+    return products.filter((product) => {
+      const material = materialMap.get(product.material_id);
+      return [
         product.id,
-        product.sku,
-        product.name,
-        product.category,
-        product.material,
-        product.location,
-      ].some((value) => value.toLowerCase().includes(normalizedQuery))
-    );
-  }, [products, query]);
+        material?.name ?? "",
+        `${product.gauge}`,
+        `${product.thickness}`,
+      ].some((value) => value.toLowerCase().includes(normalizedQuery));
+    });
+  }, [products, query, materialMap]);
 
   const selectedProduct =
     products.find((product) => product.id === selectedProductId) ?? products[0];
 
   useEffect(() => {
     if (selectedProduct) {
-      setForm(createFormState(selectedProduct));
+      setForm(createFormState(materials, selectedProduct));
     }
-  }, [selectedProduct]);
+  }, [selectedProduct, materials]);
 
   useEffect(() => {
     if (!filteredProducts.some((product) => product.id === selectedProductId)) {
       setSelectedProductId(filteredProducts[0]?.id ?? "");
     }
   }, [filteredProducts, selectedProductId]);
-
-  const lowStockCount = products.filter(
-    (product) => product.stockStatus === "low_stock"
-  ).length;
-  const activeProducts = products.filter(
-    (product) => product.stockStatus === "active"
-  ).length;
-  const inventoryUnits = products.reduce(
-    (total, product) => total + product.stockUnits,
-    0
-  );
 
   function handleChange<K extends keyof ProductFormState>(
     key: K,
@@ -173,27 +140,24 @@ export function ProductsWorkspace({
   }
 
   function handleStartCreate() {
-    setCreateForm(createFormState());
+    setCreateForm(createFormState(materials));
     setIsCreateOpen(true);
   }
 
   function handleCloseCreate() {
     setIsCreateOpen(false);
-    setCreateForm(createFormState());
+    setCreateForm(createFormState(materials));
   }
 
   function handleStartEdit(product: ProductRecord) {
     setSelectedProductId(product.id);
-    setForm(createFormState(product));
+    setForm(createFormState(materials, product));
   }
 
   function handleCancel() {
     if (selectedProduct) {
-      setForm(createFormState(selectedProduct));
-      return;
+      setForm(createFormState(materials, selectedProduct));
     }
-
-    setForm(createFormState());
   }
 
   function handleCreateProduct(event: React.FormEvent) {
@@ -220,8 +184,14 @@ export function ProductsWorkspace({
       )
     );
     setSelectedProductId(updatedProduct.id);
-    setForm(createFormState(updatedProduct));
+    setForm(createFormState(materials, updatedProduct));
   }
+
+  const avgThickness = (
+    products.reduce((sum, product) => sum + product.thickness, 0) / products.length
+  ).toFixed(2);
+  const uniqueMaterials = new Set(products.map((product) => product.material_id)).size;
+  const linkedOrders = orders.length;
 
   return (
     <main className="mx-auto flex w-full max-w-[1600px] flex-1 flex-col gap-8 p-6 lg:p-10">
@@ -232,11 +202,12 @@ export function ProductsWorkspace({
               Products
             </p>
             <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white md:text-4xl">
-              Product catalog with create and edit flows
+              Product definitions aligned to the `products` table
             </h1>
             <p className="max-w-3xl text-sm leading-6 text-slate-500 dark:text-slate-400">
-              Mock data rendered as the future product source. This page is ready
-              to swap local state for Supabase reads and writes later.
+              Products now store only `gauge`, `thickness`, and `material_id`,
+              while display names and usage summaries are resolved from related
+              materials and orders.
             </p>
           </div>
 
@@ -270,26 +241,26 @@ export function ProductsWorkspace({
         </div>
         <div className="steelflow-card-hover steelflow-card-hover--tr rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-950">
           <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">
-            Active catalog
+            Materials in use
           </p>
           <p className="mt-3 text-4xl font-black text-slate-900 dark:text-white">
-            {activeProducts}
+            {uniqueMaterials}
           </p>
         </div>
         <div className="steelflow-card-hover steelflow-card-hover--bl rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-950">
           <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">
-            Low stock
+            Avg thickness
           </p>
           <p className="mt-3 text-4xl font-black text-slate-900 dark:text-white">
-            {lowStockCount}
+            {avgThickness}mm
           </p>
         </div>
         <div className="steelflow-card-hover steelflow-card-hover--br rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-950">
           <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">
-            Inventory units
+            Linked orders
           </p>
           <p className="mt-3 text-4xl font-black text-slate-900 dark:text-white">
-            {inventoryUnits}
+            {linkedOrders}
           </p>
         </div>
       </section>
@@ -303,7 +274,7 @@ export function ProductsWorkspace({
                   Browse products
                 </h2>
                 <p className="text-sm text-slate-500 dark:text-slate-400">
-                  Search by SKU, name, category, material, or storage location.
+                  Search by UUID, material, gauge, or thickness.
                 </p>
               </div>
 
@@ -324,6 +295,7 @@ export function ProductsWorkspace({
 
           <div className="grid grid-cols-1 gap-5 2xl:grid-cols-2">
             {filteredProducts.map((product, index) => {
+              const material = materialMap.get(product.material_id);
               const tiltClass = [
                 "steelflow-card-hover--tl",
                 "steelflow-card-hover--tr",
@@ -331,6 +303,7 @@ export function ProductsWorkspace({
                 "steelflow-card-hover--br",
               ][index % 4];
               const selected = selectedProduct?.id === product.id;
+              const linked = orderCountByProduct[product.id] ?? 0;
 
               return (
                 <button
@@ -349,38 +322,36 @@ export function ProductsWorkspace({
                     <div className="flex items-start justify-between gap-4">
                       <div className="min-w-0">
                         <p className="text-xs font-bold uppercase tracking-[0.22em] text-slate-400">
-                          {product.sku}
+                          {product.id}
                         </p>
                         <h3 className="mt-2 text-xl font-black text-slate-900 dark:text-white">
-                          {product.name}
+                          {material?.name ?? "Unknown material"}
                         </h3>
                         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                          {product.category} • {product.material}
+                          Gauge {product.gauge} • Thickness {product.thickness}mm
                         </p>
                       </div>
 
-                      <span
-                        className={`rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] ${STATUS_STYLES[product.stockStatus]}`}
-                      >
-                        {STATUS_LABELS[product.stockStatus]}
+                      <span className="rounded-full bg-primary/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-primary">
+                        {linked} orders
                       </span>
                     </div>
 
                     <div className="grid grid-cols-2 gap-3">
                       <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900">
                         <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
-                          Units
+                          Gauge
                         </p>
                         <p className="mt-2 text-xl font-black text-slate-900 dark:text-white">
-                          {product.stockUnits}
+                          {product.gauge}
                         </p>
                       </div>
                       <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900">
                         <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
-                          Price / ton
+                          Thickness
                         </p>
                         <p className="mt-2 text-xl font-black text-slate-900 dark:text-white">
-                          {formatMoney(product.pricePerTon)}
+                          {product.thickness}mm
                         </p>
                       </div>
                     </div>
@@ -388,21 +359,21 @@ export function ProductsWorkspace({
                     <div className="space-y-2 text-sm text-slate-500 dark:text-slate-400">
                       <p>
                         <span className="font-semibold text-slate-900 dark:text-white">
-                          Dimensions:
+                          Material id:
                         </span>{" "}
-                        {product.dimensions}
+                        {product.material_id}
                       </p>
                       <p>
                         <span className="font-semibold text-slate-900 dark:text-white">
-                          Location:
+                          Created:
                         </span>{" "}
-                        {product.location}
+                        {formatDate(product.created_at)}
                       </p>
                       <p>
                         <span className="font-semibold text-slate-900 dark:text-white">
-                          Active orders:
+                          Updated:
                         </span>{" "}
-                        {product.activeOrders}
+                        {formatDate(product.updated_at)}
                       </p>
                     </div>
                   </div>
@@ -417,7 +388,7 @@ export function ProductsWorkspace({
                 No products found
               </p>
               <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                Try another search term or create a new product in the editor.
+                Try another search term or create a new product.
               </p>
             </div>
           )}
@@ -433,185 +404,65 @@ export function ProductsWorkspace({
                 Edit
               </p>
               <h2 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">
-                {form.name || "Edit product"}
+                {selectedProduct ? "Product row" : "Edit product"}
               </h2>
               <p className="text-sm text-slate-500 dark:text-slate-400">
                 {selectedProduct
                   ? `Selected ${selectedProduct.id} • Updated ${formatDate(
-                      selectedProduct.lastUpdated
+                      selectedProduct.updated_at
                     )}`
                   : "Select a product card to edit it."}
               </p>
             </div>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <label className="flex flex-col gap-2 text-sm">
-                <span className="font-semibold text-slate-700 dark:text-slate-300">
-                  SKU
-                </span>
-                <input
-                  className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
-                  value={form.sku}
-                  onChange={(event) => handleChange("sku", event.target.value)}
-                  required
-                />
-              </label>
-
-              <label className="flex flex-col gap-2 text-sm">
-                <span className="font-semibold text-slate-700 dark:text-slate-300">
-                  Category
-                </span>
-                <input
-                  className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
-                  value={form.category}
-                  onChange={(event) => handleChange("category", event.target.value)}
-                  required
-                />
-              </label>
-            </div>
-
             <label className="flex flex-col gap-2 text-sm">
               <span className="font-semibold text-slate-700 dark:text-slate-300">
-                Product name
+                Material
               </span>
-              <input
+              <select
                 className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
-                value={form.name}
-                onChange={(event) => handleChange("name", event.target.value)}
-                required
-              />
+                value={form.material_id}
+                onChange={(event) => handleChange("material_id", event.target.value)}
+              >
+                {materials.map((material) => (
+                  <option key={material.id} value={material.id}>
+                    {material.name}
+                  </option>
+                ))}
+              </select>
             </label>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <label className="flex flex-col gap-2 text-sm">
                 <span className="font-semibold text-slate-700 dark:text-slate-300">
-                  Material
-                </span>
-                <input
-                  className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
-                  value={form.material}
-                  onChange={(event) => handleChange("material", event.target.value)}
-                  required
-                />
-              </label>
-
-              <label className="flex flex-col gap-2 text-sm">
-                <span className="font-semibold text-slate-700 dark:text-slate-300">
-                  Dimensions
-                </span>
-                <input
-                  className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
-                  value={form.dimensions}
-                  onChange={(event) => handleChange("dimensions", event.target.value)}
-                  required
-                />
-              </label>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <label className="flex flex-col gap-2 text-sm">
-                <span className="font-semibold text-slate-700 dark:text-slate-300">
-                  Unit weight (T)
+                  Gauge
                 </span>
                 <input
                   className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
                   min="0"
+                  required
                   step="0.01"
                   type="number"
-                  value={form.unitWeight}
-                  onChange={(event) => handleChange("unitWeight", event.target.value)}
-                  required
+                  value={form.gauge}
+                  onChange={(event) => handleChange("gauge", event.target.value)}
                 />
               </label>
 
               <label className="flex flex-col gap-2 text-sm">
                 <span className="font-semibold text-slate-700 dark:text-slate-300">
-                  Price per ton
+                  Thickness
                 </span>
                 <input
                   className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
                   min="0"
-                  step="1"
-                  type="number"
-                  value={form.pricePerTon}
-                  onChange={(event) => handleChange("pricePerTon", event.target.value)}
                   required
+                  step="0.01"
+                  type="number"
+                  value={form.thickness}
+                  onChange={(event) => handleChange("thickness", event.target.value)}
                 />
               </label>
             </div>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <label className="flex flex-col gap-2 text-sm">
-                <span className="font-semibold text-slate-700 dark:text-slate-300">
-                  Status
-                </span>
-                <select
-                  className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
-                  value={form.stockStatus}
-                  onChange={(event) =>
-                    handleChange("stockStatus", event.target.value as ProductStatus)
-                  }
-                >
-                  <option value="active">Active</option>
-                  <option value="low_stock">Low stock</option>
-                  <option value="draft">Draft</option>
-                </select>
-              </label>
-
-              <label className="flex flex-col gap-2 text-sm">
-                <span className="font-semibold text-slate-700 dark:text-slate-300">
-                  Stock units
-                </span>
-                <input
-                  className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
-                  min="0"
-                  step="1"
-                  type="number"
-                  value={form.stockUnits}
-                  onChange={(event) => handleChange("stockUnits", event.target.value)}
-                  required
-                />
-              </label>
-
-              <label className="flex flex-col gap-2 text-sm">
-                <span className="font-semibold text-slate-700 dark:text-slate-300">
-                  Active orders
-                </span>
-                <input
-                  className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
-                  min="0"
-                  step="1"
-                  type="number"
-                  value={form.activeOrders}
-                  onChange={(event) => handleChange("activeOrders", event.target.value)}
-                  required
-                />
-              </label>
-            </div>
-
-            <label className="flex flex-col gap-2 text-sm">
-              <span className="font-semibold text-slate-700 dark:text-slate-300">
-                Storage location
-              </span>
-              <input
-                className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
-                value={form.location}
-                onChange={(event) => handleChange("location", event.target.value)}
-                required
-              />
-            </label>
-
-            <label className="flex flex-col gap-2 text-sm">
-              <span className="font-semibold text-slate-700 dark:text-slate-300">
-                Description
-              </span>
-              <textarea
-                className="min-h-28 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
-                value={form.description}
-                onChange={(event) => handleChange("description", event.target.value)}
-                required
-              />
-            </label>
 
             <div className="flex flex-col gap-3 sm:flex-row">
               <button
@@ -633,7 +484,7 @@ export function ProductsWorkspace({
       </section>
 
       <CreateEntityModal
-        description="Create a product locally with the same record shape we can later persist in Supabase."
+        description="Create a product row that matches the `products` schema with `gauge`, `thickness`, and `material_id`."
         formId="create-product-form"
         open={isCreateOpen}
         submitLabel="Create product"
@@ -645,75 +496,28 @@ export function ProductsWorkspace({
           id="create-product-form"
           onSubmit={handleCreateProduct}
         >
-          <label className="flex flex-col gap-2 text-sm">
-            <span className="font-semibold text-slate-700 dark:text-slate-300">
-              SKU
-            </span>
-            <input
-              className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
-              required
-              value={createForm.sku}
-              onChange={(event) => handleCreateChange("sku", event.target.value)}
-            />
-          </label>
-
-          <label className="flex flex-col gap-2 text-sm">
-            <span className="font-semibold text-slate-700 dark:text-slate-300">
-              Category
-            </span>
-            <input
-              className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
-              required
-              value={createForm.category}
-              onChange={(event) =>
-                handleCreateChange("category", event.target.value)
-              }
-            />
-          </label>
-
           <label className="flex flex-col gap-2 text-sm sm:col-span-2">
-            <span className="font-semibold text-slate-700 dark:text-slate-300">
-              Product name
-            </span>
-            <input
-              className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
-              required
-              value={createForm.name}
-              onChange={(event) => handleCreateChange("name", event.target.value)}
-            />
-          </label>
-
-          <label className="flex flex-col gap-2 text-sm">
             <span className="font-semibold text-slate-700 dark:text-slate-300">
               Material
             </span>
-            <input
+            <select
               className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
-              required
-              value={createForm.material}
+              value={createForm.material_id}
               onChange={(event) =>
-                handleCreateChange("material", event.target.value)
+                handleCreateChange("material_id", event.target.value)
               }
-            />
+            >
+              {materials.map((material) => (
+                <option key={material.id} value={material.id}>
+                  {material.name}
+                </option>
+              ))}
+            </select>
           </label>
 
           <label className="flex flex-col gap-2 text-sm">
             <span className="font-semibold text-slate-700 dark:text-slate-300">
-              Dimensions
-            </span>
-            <input
-              className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
-              required
-              value={createForm.dimensions}
-              onChange={(event) =>
-                handleCreateChange("dimensions", event.target.value)
-              }
-            />
-          </label>
-
-          <label className="flex flex-col gap-2 text-sm">
-            <span className="font-semibold text-slate-700 dark:text-slate-300">
-              Unit weight (T)
+              Gauge
             </span>
             <input
               className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
@@ -721,108 +525,24 @@ export function ProductsWorkspace({
               required
               step="0.01"
               type="number"
-              value={createForm.unitWeight}
-              onChange={(event) =>
-                handleCreateChange("unitWeight", event.target.value)
-              }
+              value={createForm.gauge}
+              onChange={(event) => handleCreateChange("gauge", event.target.value)}
             />
           </label>
 
           <label className="flex flex-col gap-2 text-sm">
             <span className="font-semibold text-slate-700 dark:text-slate-300">
-              Price per ton
+              Thickness
             </span>
             <input
               className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
               min="0"
               required
-              step="1"
+              step="0.01"
               type="number"
-              value={createForm.pricePerTon}
+              value={createForm.thickness}
               onChange={(event) =>
-                handleCreateChange("pricePerTon", event.target.value)
-              }
-            />
-          </label>
-
-          <label className="flex flex-col gap-2 text-sm">
-            <span className="font-semibold text-slate-700 dark:text-slate-300">
-              Status
-            </span>
-            <select
-              className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
-              value={createForm.stockStatus}
-              onChange={(event) =>
-                handleCreateChange(
-                  "stockStatus",
-                  event.target.value as ProductStatus
-                )
-              }
-            >
-              <option value="active">Active</option>
-              <option value="low_stock">Low stock</option>
-              <option value="draft">Draft</option>
-            </select>
-          </label>
-
-          <label className="flex flex-col gap-2 text-sm">
-            <span className="font-semibold text-slate-700 dark:text-slate-300">
-              Stock units
-            </span>
-            <input
-              className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
-              min="0"
-              required
-              step="1"
-              type="number"
-              value={createForm.stockUnits}
-              onChange={(event) =>
-                handleCreateChange("stockUnits", event.target.value)
-              }
-            />
-          </label>
-
-          <label className="flex flex-col gap-2 text-sm">
-            <span className="font-semibold text-slate-700 dark:text-slate-300">
-              Active orders
-            </span>
-            <input
-              className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
-              min="0"
-              required
-              step="1"
-              type="number"
-              value={createForm.activeOrders}
-              onChange={(event) =>
-                handleCreateChange("activeOrders", event.target.value)
-              }
-            />
-          </label>
-
-          <label className="flex flex-col gap-2 text-sm">
-            <span className="font-semibold text-slate-700 dark:text-slate-300">
-              Storage location
-            </span>
-            <input
-              className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
-              required
-              value={createForm.location}
-              onChange={(event) =>
-                handleCreateChange("location", event.target.value)
-              }
-            />
-          </label>
-
-          <label className="flex flex-col gap-2 text-sm sm:col-span-2">
-            <span className="font-semibold text-slate-700 dark:text-slate-300">
-              Description
-            </span>
-            <textarea
-              className="min-h-28 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
-              required
-              value={createForm.description}
-              onChange={(event) =>
-                handleCreateChange("description", event.target.value)
+                handleCreateChange("thickness", event.target.value)
               }
             />
           </label>
