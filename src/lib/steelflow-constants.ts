@@ -1,0 +1,2 @@
+export const STEELFLOW_AVATAR_URL =
+  "https://lh3.googleusercontent.com/aida-public/AB6AXuDKQyF0c7BDQPow26MfTIhDXR-Bo4oHfvc1-WDUplR-PVZoHhJrWqRpssa-bLkAUpO_sMpA6LRh0O4OUkcL71fpN65tffJRluxdCIB5LhBlfZsRgljl2_cuEgIJX8dPYdSJ83LMvn8VRC0-V-Mq7qkhR0FYJ_tBC5svCws3IUvdrsjxTnqDtfrx8heq8YuZE2iNzKMFkzChyjqmTWH29cQxbqNTUYYwiD4nV6yB2jjA1Krd4PDP5ReDrwHHbdIJTgnhREoh9oJoBk4";
