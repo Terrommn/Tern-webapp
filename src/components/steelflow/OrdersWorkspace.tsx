@@ -1,9 +1,25 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { CreateEntityModal } from "@/components/steelflow/CreateEntityModal";
 import type { OrderRecord } from "@/types/order";
 
 type StatusFilter = "all" | OrderRecord["status"];
+type OrderFormState = {
+  clientName: string;
+  partNumber: string;
+  dueDate: string;
+  priority: OrderRecord["priority"];
+  autoMatch: OrderRecord["autoMatch"];
+  status: OrderRecord["status"];
+  tonnage: string;
+  progress: string;
+  plant: string;
+  accountOwner: string;
+  notes: string;
+  blockers: string;
+  recommendations: string;
+};
 
 const PRIORITY_STYLES: Record<OrderRecord["priority"], string> = {
   critical:
@@ -51,10 +67,31 @@ function formatDate(value: string) {
   }).format(new Date(value));
 }
 
-export function OrdersWorkspace({ orders }: { orders: OrderRecord[] }) {
+function createOrderFormState(): OrderFormState {
+  return {
+    clientName: "",
+    partNumber: "",
+    dueDate: "",
+    priority: "medium",
+    autoMatch: "matched",
+    status: "ready",
+    tonnage: "",
+    progress: "0",
+    plant: "",
+    accountOwner: "",
+    notes: "",
+    blockers: "",
+    recommendations: "",
+  };
+}
+
+export function OrdersWorkspace({ orders: initialOrders }: { orders: OrderRecord[] }) {
+  const [orders, setOrders] = useState(initialOrders);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-  const [selectedOrderId, setSelectedOrderId] = useState(orders[0]?.id ?? "");
+  const [selectedOrderId, setSelectedOrderId] = useState(initialOrders[0]?.id ?? "");
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [form, setForm] = useState<OrderFormState>(createOrderFormState());
 
   const filteredOrders = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -90,6 +127,66 @@ export function OrdersWorkspace({ orders }: { orders: OrderRecord[] }) {
     orders.reduce((sum, order) => sum + order.progress, 0) / orders.length
   );
 
+  useEffect(() => {
+    if (!filteredOrders.some((order) => order.id === selectedOrderId)) {
+      setSelectedOrderId(filteredOrders[0]?.id ?? "");
+    }
+  }, [filteredOrders, selectedOrderId]);
+
+  function handleChange<K extends keyof OrderFormState>(
+    key: K,
+    value: OrderFormState[K]
+  ) {
+    setForm((current) => ({
+      ...current,
+      [key]: value,
+    }));
+  }
+
+  function handleOpenCreate() {
+    setForm(createOrderFormState());
+    setIsCreateOpen(true);
+  }
+
+  function handleCloseCreate() {
+    setIsCreateOpen(false);
+    setForm(createOrderFormState());
+  }
+
+  function handleCreateOrder(event: React.FormEvent) {
+    event.preventDefault();
+
+    const newOrder: OrderRecord = {
+      id: `ORD-${Date.now().toString().slice(-6)}`,
+      clientName: form.clientName.trim(),
+      partNumber: form.partNumber.trim(),
+      receivedAt: new Date().toISOString(),
+      dueDate: new Date(form.dueDate || new Date().toISOString()).toISOString(),
+      priority: form.priority,
+      autoMatch: form.autoMatch,
+      status: form.status,
+      tonnage: Number(form.tonnage),
+      progress: Number(form.progress),
+      plant: form.plant.trim(),
+      accountOwner: form.accountOwner.trim(),
+      notes: form.notes.trim(),
+      blockers: form.blockers
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean),
+      recommendations: form.recommendations
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean),
+    };
+
+    setOrders((current) => [newOrder, ...current]);
+    setSelectedOrderId(newOrder.id);
+    setQuery("");
+    setStatusFilter("all");
+    handleCloseCreate();
+  }
+
   return (
     <main className="mx-auto flex w-full max-w-[1600px] flex-1 flex-col gap-8 p-6 lg:p-10">
       <section className="steelflow-card-hover steelflow-card-hover--tl rounded-[32px] border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-8 shadow-sm dark:border-slate-800 dark:from-slate-950 dark:to-slate-900">
@@ -111,6 +208,7 @@ export function OrdersWorkspace({ orders }: { orders: OrderRecord[] }) {
             <button
               className="rounded-2xl bg-primary px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary/90"
               type="button"
+              onClick={handleOpenCreate}
             >
               Create order
             </button>
@@ -457,6 +555,205 @@ export function OrdersWorkspace({ orders }: { orders: OrderRecord[] }) {
           )}
         </aside>
       </section>
+
+      <CreateEntityModal
+        description="Create an order locally with the same record shape that we can later insert into Supabase."
+        formId="create-order-form"
+        open={isCreateOpen}
+        submitLabel="Create order"
+        title="New order"
+        onClose={handleCloseCreate}
+      >
+        <form
+          className="grid grid-cols-1 gap-4 sm:grid-cols-2"
+          id="create-order-form"
+          onSubmit={handleCreateOrder}
+        >
+          <label className="flex flex-col gap-2 text-sm">
+            <span className="font-semibold text-slate-700 dark:text-slate-300">
+              Client
+            </span>
+            <input
+              className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+              required
+              value={form.clientName}
+              onChange={(event) => handleChange("clientName", event.target.value)}
+            />
+          </label>
+
+          <label className="flex flex-col gap-2 text-sm">
+            <span className="font-semibold text-slate-700 dark:text-slate-300">
+              Part number
+            </span>
+            <input
+              className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+              required
+              value={form.partNumber}
+              onChange={(event) => handleChange("partNumber", event.target.value)}
+            />
+          </label>
+
+          <label className="flex flex-col gap-2 text-sm">
+            <span className="font-semibold text-slate-700 dark:text-slate-300">
+              Due date
+            </span>
+            <input
+              className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+              required
+              type="date"
+              value={form.dueDate}
+              onChange={(event) => handleChange("dueDate", event.target.value)}
+            />
+          </label>
+
+          <label className="flex flex-col gap-2 text-sm">
+            <span className="font-semibold text-slate-700 dark:text-slate-300">
+              Plant
+            </span>
+            <input
+              className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+              required
+              value={form.plant}
+              onChange={(event) => handleChange("plant", event.target.value)}
+            />
+          </label>
+
+          <label className="flex flex-col gap-2 text-sm">
+            <span className="font-semibold text-slate-700 dark:text-slate-300">
+              Priority
+            </span>
+            <select
+              className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+              value={form.priority}
+              onChange={(event) =>
+                handleChange("priority", event.target.value as OrderRecord["priority"])
+              }
+            >
+              <option value="critical">Critical</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+            </select>
+          </label>
+
+          <label className="flex flex-col gap-2 text-sm">
+            <span className="font-semibold text-slate-700 dark:text-slate-300">
+              Account owner
+            </span>
+            <input
+              className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+              required
+              value={form.accountOwner}
+              onChange={(event) => handleChange("accountOwner", event.target.value)}
+            />
+          </label>
+
+          <label className="flex flex-col gap-2 text-sm">
+            <span className="font-semibold text-slate-700 dark:text-slate-300">
+              Auto-match
+            </span>
+            <select
+              className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+              value={form.autoMatch}
+              onChange={(event) =>
+                handleChange(
+                  "autoMatch",
+                  event.target.value as OrderRecord["autoMatch"]
+                )
+              }
+            >
+              <option value="matched">Matched</option>
+              <option value="partial">Partial</option>
+              <option value="missing">Missing</option>
+            </select>
+          </label>
+
+          <label className="flex flex-col gap-2 text-sm">
+            <span className="font-semibold text-slate-700 dark:text-slate-300">
+              Status
+            </span>
+            <select
+              className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+              value={form.status}
+              onChange={(event) =>
+                handleChange("status", event.target.value as OrderRecord["status"])
+              }
+            >
+              <option value="ready">Ready</option>
+              <option value="in_review">In review</option>
+              <option value="blocked">Blocked</option>
+            </select>
+          </label>
+
+          <label className="flex flex-col gap-2 text-sm">
+            <span className="font-semibold text-slate-700 dark:text-slate-300">
+              Tonnage
+            </span>
+            <input
+              className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+              min="0"
+              required
+              step="0.1"
+              type="number"
+              value={form.tonnage}
+              onChange={(event) => handleChange("tonnage", event.target.value)}
+            />
+          </label>
+
+          <label className="flex flex-col gap-2 text-sm">
+            <span className="font-semibold text-slate-700 dark:text-slate-300">
+              Progress %
+            </span>
+            <input
+              className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+              max="100"
+              min="0"
+              required
+              step="1"
+              type="number"
+              value={form.progress}
+              onChange={(event) => handleChange("progress", event.target.value)}
+            />
+          </label>
+
+          <label className="flex flex-col gap-2 text-sm sm:col-span-2">
+            <span className="font-semibold text-slate-700 dark:text-slate-300">
+              Notes
+            </span>
+            <textarea
+              className="min-h-24 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+              required
+              value={form.notes}
+              onChange={(event) => handleChange("notes", event.target.value)}
+            />
+          </label>
+
+          <label className="flex flex-col gap-2 text-sm sm:col-span-2">
+            <span className="font-semibold text-slate-700 dark:text-slate-300">
+              Blockers
+            </span>
+            <input
+              className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+              placeholder="Thickness missing, Waiting for approval"
+              value={form.blockers}
+              onChange={(event) => handleChange("blockers", event.target.value)}
+            />
+          </label>
+
+          <label className="flex flex-col gap-2 text-sm sm:col-span-2">
+            <span className="font-semibold text-slate-700 dark:text-slate-300">
+              Recommendations
+            </span>
+            <input
+              className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+              placeholder="Group with ORD-2026-108, Pre-book dock slot"
+              value={form.recommendations}
+              onChange={(event) =>
+                handleChange("recommendations", event.target.value)
+              }
+            />
+          </label>
+        </form>
+      </CreateEntityModal>
     </main>
   );
 }

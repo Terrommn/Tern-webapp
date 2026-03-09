@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { CreateEntityModal } from "@/components/steelflow/CreateEntityModal";
 import type { ProductRecord, ProductStatus } from "@/types/product";
 
 type ProductFormState = {
@@ -98,9 +99,12 @@ export function ProductsWorkspace({
   const [selectedProductId, setSelectedProductId] = useState(
     initialProducts[0]?.id ?? ""
   );
-  const [editorMode, setEditorMode] = useState<"create" | "edit">("edit");
   const [form, setForm] = useState<ProductFormState>(
     createFormState(initialProducts[0])
+  );
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [createForm, setCreateForm] = useState<ProductFormState>(
+    createFormState()
   );
 
   const filteredProducts = useMemo(() => {
@@ -126,10 +130,10 @@ export function ProductsWorkspace({
     products.find((product) => product.id === selectedProductId) ?? products[0];
 
   useEffect(() => {
-    if (editorMode === "edit" && selectedProduct) {
+    if (selectedProduct) {
       setForm(createFormState(selectedProduct));
     }
-  }, [editorMode, selectedProduct]);
+  }, [selectedProduct]);
 
   useEffect(() => {
     if (!filteredProducts.some((product) => product.id === selectedProductId)) {
@@ -158,39 +162,52 @@ export function ProductsWorkspace({
     }));
   }
 
+  function handleCreateChange<K extends keyof ProductFormState>(
+    key: K,
+    value: ProductFormState[K]
+  ) {
+    setCreateForm((current) => ({
+      ...current,
+      [key]: value,
+    }));
+  }
+
   function handleStartCreate() {
-    setEditorMode("create");
-    setForm(createFormState());
+    setCreateForm(createFormState());
+    setIsCreateOpen(true);
+  }
+
+  function handleCloseCreate() {
+    setIsCreateOpen(false);
+    setCreateForm(createFormState());
   }
 
   function handleStartEdit(product: ProductRecord) {
     setSelectedProductId(product.id);
-    setEditorMode("edit");
     setForm(createFormState(product));
   }
 
   function handleCancel() {
     if (selectedProduct) {
-      setEditorMode("edit");
       setForm(createFormState(selectedProduct));
       return;
     }
 
-    setEditorMode("create");
     setForm(createFormState());
+  }
+
+  function handleCreateProduct(event: React.FormEvent) {
+    event.preventDefault();
+
+    const newProduct = buildProductFromForm(createForm);
+    setProducts((current) => [newProduct, ...current]);
+    setSelectedProductId(newProduct.id);
+    setQuery("");
+    handleCloseCreate();
   }
 
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
-
-    if (editorMode === "create") {
-      const newProduct = buildProductFromForm(form);
-      setProducts((current) => [newProduct, ...current]);
-      setSelectedProductId(newProduct.id);
-      setEditorMode("edit");
-      setForm(createFormState(newProduct));
-      return;
-    }
 
     if (!selectedProduct) {
       return;
@@ -413,19 +430,17 @@ export function ProductsWorkspace({
           >
             <div className="space-y-2">
               <p className="text-xs font-bold uppercase tracking-[0.24em] text-primary">
-                {editorMode === "create" ? "Create" : "Edit"}
+                Edit
               </p>
               <h2 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">
-                {editorMode === "create" ? "New product" : form.name || "Edit product"}
+                {form.name || "Edit product"}
               </h2>
               <p className="text-sm text-slate-500 dark:text-slate-400">
-                {editorMode === "create"
-                  ? "Create a product locally with the same structure we can later send to Supabase."
-                  : selectedProduct
-                    ? `Selected ${selectedProduct.id} • Updated ${formatDate(
-                        selectedProduct.lastUpdated
-                      )}`
-                    : "Select a product card to edit it."}
+                {selectedProduct
+                  ? `Selected ${selectedProduct.id} • Updated ${formatDate(
+                      selectedProduct.lastUpdated
+                    )}`
+                  : "Select a product card to edit it."}
               </p>
             </div>
 
@@ -603,7 +618,7 @@ export function ProductsWorkspace({
                 className="rounded-2xl bg-primary px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary/90"
                 type="submit"
               >
-                {editorMode === "create" ? "Create product" : "Save changes"}
+                Save changes
               </button>
               <button
                 className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
@@ -616,6 +631,203 @@ export function ProductsWorkspace({
           </form>
         </aside>
       </section>
+
+      <CreateEntityModal
+        description="Create a product locally with the same record shape we can later persist in Supabase."
+        formId="create-product-form"
+        open={isCreateOpen}
+        submitLabel="Create product"
+        title="New product"
+        onClose={handleCloseCreate}
+      >
+        <form
+          className="grid grid-cols-1 gap-4 sm:grid-cols-2"
+          id="create-product-form"
+          onSubmit={handleCreateProduct}
+        >
+          <label className="flex flex-col gap-2 text-sm">
+            <span className="font-semibold text-slate-700 dark:text-slate-300">
+              SKU
+            </span>
+            <input
+              className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+              required
+              value={createForm.sku}
+              onChange={(event) => handleCreateChange("sku", event.target.value)}
+            />
+          </label>
+
+          <label className="flex flex-col gap-2 text-sm">
+            <span className="font-semibold text-slate-700 dark:text-slate-300">
+              Category
+            </span>
+            <input
+              className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+              required
+              value={createForm.category}
+              onChange={(event) =>
+                handleCreateChange("category", event.target.value)
+              }
+            />
+          </label>
+
+          <label className="flex flex-col gap-2 text-sm sm:col-span-2">
+            <span className="font-semibold text-slate-700 dark:text-slate-300">
+              Product name
+            </span>
+            <input
+              className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+              required
+              value={createForm.name}
+              onChange={(event) => handleCreateChange("name", event.target.value)}
+            />
+          </label>
+
+          <label className="flex flex-col gap-2 text-sm">
+            <span className="font-semibold text-slate-700 dark:text-slate-300">
+              Material
+            </span>
+            <input
+              className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+              required
+              value={createForm.material}
+              onChange={(event) =>
+                handleCreateChange("material", event.target.value)
+              }
+            />
+          </label>
+
+          <label className="flex flex-col gap-2 text-sm">
+            <span className="font-semibold text-slate-700 dark:text-slate-300">
+              Dimensions
+            </span>
+            <input
+              className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+              required
+              value={createForm.dimensions}
+              onChange={(event) =>
+                handleCreateChange("dimensions", event.target.value)
+              }
+            />
+          </label>
+
+          <label className="flex flex-col gap-2 text-sm">
+            <span className="font-semibold text-slate-700 dark:text-slate-300">
+              Unit weight (T)
+            </span>
+            <input
+              className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+              min="0"
+              required
+              step="0.01"
+              type="number"
+              value={createForm.unitWeight}
+              onChange={(event) =>
+                handleCreateChange("unitWeight", event.target.value)
+              }
+            />
+          </label>
+
+          <label className="flex flex-col gap-2 text-sm">
+            <span className="font-semibold text-slate-700 dark:text-slate-300">
+              Price per ton
+            </span>
+            <input
+              className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+              min="0"
+              required
+              step="1"
+              type="number"
+              value={createForm.pricePerTon}
+              onChange={(event) =>
+                handleCreateChange("pricePerTon", event.target.value)
+              }
+            />
+          </label>
+
+          <label className="flex flex-col gap-2 text-sm">
+            <span className="font-semibold text-slate-700 dark:text-slate-300">
+              Status
+            </span>
+            <select
+              className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+              value={createForm.stockStatus}
+              onChange={(event) =>
+                handleCreateChange(
+                  "stockStatus",
+                  event.target.value as ProductStatus
+                )
+              }
+            >
+              <option value="active">Active</option>
+              <option value="low_stock">Low stock</option>
+              <option value="draft">Draft</option>
+            </select>
+          </label>
+
+          <label className="flex flex-col gap-2 text-sm">
+            <span className="font-semibold text-slate-700 dark:text-slate-300">
+              Stock units
+            </span>
+            <input
+              className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+              min="0"
+              required
+              step="1"
+              type="number"
+              value={createForm.stockUnits}
+              onChange={(event) =>
+                handleCreateChange("stockUnits", event.target.value)
+              }
+            />
+          </label>
+
+          <label className="flex flex-col gap-2 text-sm">
+            <span className="font-semibold text-slate-700 dark:text-slate-300">
+              Active orders
+            </span>
+            <input
+              className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+              min="0"
+              required
+              step="1"
+              type="number"
+              value={createForm.activeOrders}
+              onChange={(event) =>
+                handleCreateChange("activeOrders", event.target.value)
+              }
+            />
+          </label>
+
+          <label className="flex flex-col gap-2 text-sm">
+            <span className="font-semibold text-slate-700 dark:text-slate-300">
+              Storage location
+            </span>
+            <input
+              className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+              required
+              value={createForm.location}
+              onChange={(event) =>
+                handleCreateChange("location", event.target.value)
+              }
+            />
+          </label>
+
+          <label className="flex flex-col gap-2 text-sm sm:col-span-2">
+            <span className="font-semibold text-slate-700 dark:text-slate-300">
+              Description
+            </span>
+            <textarea
+              className="min-h-28 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+              required
+              value={createForm.description}
+              onChange={(event) =>
+                handleCreateChange("description", event.target.value)
+              }
+            />
+          </label>
+        </form>
+      </CreateEntityModal>
     </main>
   );
 }

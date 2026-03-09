@@ -1,127 +1,50 @@
 [
   {
-    "id": "ORD-2026-101",
-    "clientName": "Acero Industrial MX",
-    "partNumber": "ST-4049-X",
-    "receivedAt": "2026-03-08T09:30:00.000Z",
-    "dueDate": "2026-03-12T18:00:00.000Z",
-    "priority": "high",
-    "autoMatch": "matched",
-    "status": "ready",
-    "tonnage": 48.5,
-    "progress": 82,
-    "plant": "Monterrey Plant",
-    "accountOwner": "Ana Torres",
-    "notes": "Client requested accelerated batching for two outbound trucks.",
-    "blockers": [],
-    "recommendations": [
-      "Reserve packaging line 2 for final wrapping.",
-      "Group with ORD-2026-108 to improve pallet density."
-    ]
+    "id": "d1111111-1111-4111-8111-111111111111",
+    "client_id": "c7e0c2c1-9f70-4ad7-8d90-111111111111",
+    "product_id": "b1111111-1111-4111-8111-111111111111",
+    "quantity_kg": 24500,
+    "created_at": "2026-03-08T09:30:00.000Z",
+    "updated_at": "2026-03-08T11:00:00.000Z"
   },
   {
-    "id": "ORD-2026-102",
-    "clientName": "Constructora Norte",
-    "partNumber": "UNK-9921",
-    "receivedAt": "2026-03-08T11:15:00.000Z",
-    "dueDate": "2026-03-11T16:00:00.000Z",
-    "priority": "critical",
-    "autoMatch": "missing",
-    "status": "blocked",
-    "tonnage": 31.2,
-    "progress": 24,
-    "plant": "Saltillo Plant",
-    "accountOwner": "Carlos Mena",
-    "notes": "Missing specification parameters for thickness and coating validation.",
-    "blockers": [
-      "Thickness value missing",
-      "Coating standard not confirmed",
-      "Customer approval still pending"
-    ],
-    "recommendations": [
-      "Request spec sheet from customer portal.",
-      "Use last approved profile as temporary baseline for review."
-    ]
+    "id": "d2222222-2222-4222-8222-222222222222",
+    "client_id": "c7e0c2c1-9f70-4ad7-8d90-222222222222",
+    "product_id": "b3333333-3333-4333-8333-333333333333",
+    "quantity_kg": 18200,
+    "created_at": "2026-03-08T11:15:00.000Z",
+    "updated_at": "2026-03-08T12:20:00.000Z"
   },
   {
-    "id": "ORD-2026-103",
-    "clientName": "Global Steel",
-    "partNumber": "GS-2201-A",
-    "receivedAt": "2026-03-07T08:10:00.000Z",
-    "dueDate": "2026-03-13T17:30:00.000Z",
-    "priority": "medium",
-    "autoMatch": "matched",
-    "status": "ready",
-    "tonnage": 22.4,
-    "progress": 67,
-    "plant": "Queretaro Plant",
-    "accountOwner": "Lucia Vega",
-    "notes": "Stable order with standard compliance and no open data gaps.",
-    "blockers": [],
-    "recommendations": [
-      "Keep current routing and release to production planning."
-    ]
+    "id": "d3333333-3333-4333-8333-333333333333",
+    "client_id": "c7e0c2c1-9f70-4ad7-8d90-333333333333",
+    "product_id": "b6666666-6666-4666-8666-666666666666",
+    "quantity_kg": 9600,
+    "created_at": "2026-03-07T08:10:00.000Z",
+    "updated_at": "2026-03-08T08:30:00.000Z"
   },
   {
-    "id": "ORD-2026-104",
-    "clientName": "AutoParts Intl",
-    "partNumber": "AP-5500-Z",
-    "receivedAt": "2026-03-06T15:20:00.000Z",
-    "dueDate": "2026-03-10T13:00:00.000Z",
-    "priority": "high",
-    "autoMatch": "partial",
-    "status": "in_review",
-    "tonnage": 18.9,
-    "progress": 53,
-    "plant": "Monterrey Plant",
-    "accountOwner": "Diego Salas",
-    "notes": "Rule engine detected a coating deviation against previous order history.",
-    "blockers": [
-      "Coating mismatch versus prior approved runs"
-    ],
-    "recommendations": [
-      "Review alternate finish allowed by the customer.",
-      "Escalate to quality before releasing to packaging."
-    ]
+    "id": "d4444444-4444-4444-8444-444444444444",
+    "client_id": "c7e0c2c1-9f70-4ad7-8d90-444444444444",
+    "product_id": "b4444444-4444-4444-8444-444444444444",
+    "quantity_kg": 38800,
+    "created_at": "2026-03-06T15:20:00.000Z",
+    "updated_at": "2026-03-08T09:45:00.000Z"
   },
   {
-    "id": "ORD-2026-105",
-    "clientName": "Metro Rail Dev",
-    "partNumber": "MR-7780-B",
-    "receivedAt": "2026-03-05T10:45:00.000Z",
-    "dueDate": "2026-03-14T19:00:00.000Z",
-    "priority": "medium",
-    "autoMatch": "matched",
-    "status": "ready",
-    "tonnage": 64.8,
-    "progress": 76,
-    "plant": "Guadalajara Plant",
-    "accountOwner": "Ana Torres",
-    "notes": "Large reinforcement order with clean data and consistent routing.",
-    "blockers": [],
-    "recommendations": [
-      "Pre-book dock slot for outbound rail transfer."
-    ]
+    "id": "d5555555-5555-4555-8555-555555555555",
+    "client_id": "c7e0c2c1-9f70-4ad7-8d90-555555555555",
+    "product_id": "b2222222-2222-4222-8222-222222222222",
+    "quantity_kg": 21400,
+    "created_at": "2026-03-05T10:45:00.000Z",
+    "updated_at": "2026-03-07T16:15:00.000Z"
   },
   {
-    "id": "ORD-2026-106",
-    "clientName": "Pacific Forge",
-    "partNumber": "PF-3002-C",
-    "receivedAt": "2026-03-04T13:05:00.000Z",
-    "dueDate": "2026-03-15T14:30:00.000Z",
-    "priority": "high",
-    "autoMatch": "partial",
-    "status": "in_review",
-    "tonnage": 39.7,
-    "progress": 44,
-    "plant": "Saltillo Plant",
-    "accountOwner": "Carlos Mena",
-    "notes": "Export order requires final documentation and bundle confirmation.",
-    "blockers": [
-      "Export packing list incomplete"
-    ],
-    "recommendations": [
-      "Validate export bundle sequence before final release."
-    ]
+    "id": "d6666666-6666-4666-8666-666666666666",
+    "client_id": "c7e0c2c1-9f70-4ad7-8d90-666666666666",
+    "product_id": "b5555555-5555-4555-8555-555555555555",
+    "quantity_kg": 15400,
+    "created_at": "2026-03-04T13:05:00.000Z",
+    "updated_at": "2026-03-08T13:45:00.000Z"
   }
 ]
