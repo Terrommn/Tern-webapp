@@ -20,6 +20,11 @@ const NAV_ITEMS = [
     label: "Orders",
     icon: "receipt_long",
   },
+  {
+    href: "/productos",
+    label: "Products",
+    icon: "inventory_2",
+  },
 ] as const;
 
 function isActivePath(pathname: string, href: string) {
