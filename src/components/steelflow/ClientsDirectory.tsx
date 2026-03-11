@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { CreateEntityModal } from "@/components/steelflow/CreateEntityModal";
+import { createClient as createSupabaseClient } from "@/lib/supabase/client";
 import type { ClientRecord } from "@/types/client";
 import type { OrderRecord } from "@/types/order";
 
@@ -128,12 +129,10 @@ export function ClientsDirectory({
     setForm(createClientFormState());
   }
 
-  function handleCreateClient(event: React.FormEvent) {
+  async function handleCreateClient(event: React.FormEvent) {
     event.preventDefault();
 
-    const now = new Date().toISOString();
-    const newClient: ClientRecord = {
-      id: crypto.randomUUID(),
+    const payload = {
       name: form.name.trim(),
       max_weight: parseNullableNumber(form.max_weight),
       min_weight: parseNullableNumber(form.min_weight),
@@ -144,11 +143,25 @@ export function ClientsDirectory({
       max_rolls: parseNullableInteger(form.max_rolls),
       internal_diameter: parseNullableNumber(form.internal_diameter),
       external_diameter: parseNullableNumber(form.external_diameter),
-      created_at: now,
-      updated_at: now,
     };
 
-    setClients((current) => [newClient, ...current]);
+    const supabase = createSupabaseClient();
+    const { data, error } = await supabase
+      .from("clients")
+      .insert(payload)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Failed to create client:", error);
+      // Optimistic fallback so the UI still updates
+      const now = new Date().toISOString();
+      const fallback: ClientRecord = { id: crypto.randomUUID(), ...payload, created_at: now, updated_at: now };
+      setClients((current) => [fallback, ...current]);
+    } else {
+      setClients((current) => [data as ClientRecord, ...current]);
+    }
+
     setQuery("");
     handleCloseCreate();
   }

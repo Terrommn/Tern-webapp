@@ -1,9 +1,6 @@
 import { OrdersWorkspace } from "@/components/steelflow/OrdersWorkspace";
 import { SteelFlowShell } from "@/components/steelflow/SteelFlowShell";
-import mockClients from "@/data/mock-clients.json";
-import mockMaterials from "@/data/mock-materials.json";
-import mockOrders from "@/data/mock-orders.json";
-import mockProducts from "@/data/mock-products.json";
+import { createClient } from "@/lib/supabase/server";
 import type { ClientRecord } from "@/types/client";
 import type { MaterialRecord } from "@/types/material";
 import type { OrderRecord } from "@/types/order";
@@ -14,12 +11,21 @@ export const metadata = {
   description: "Order queue and planning dashboard with AI-assisted gap analysis.",
 };
 
-const orders = mockOrders as OrderRecord[];
-const clients = mockClients as ClientRecord[];
-const products = mockProducts as ProductRecord[];
-const materials = mockMaterials as MaterialRecord[];
+export default async function OrdenesPage() {
+  const supabase = await createClient();
 
-export default function OrdenesPage() {
+  const [ordersRes, clientsRes, productsRes, materialsRes] = await Promise.all([
+    supabase.from("orders").select("*"),
+    supabase.from("clients").select("*"),
+    supabase.from("products").select("*"),
+    supabase.from("materials").select("*"),
+  ]);
+
+  const orders = (ordersRes.data ?? []) as OrderRecord[];
+  const clients = (clientsRes.data ?? []) as ClientRecord[];
+  const products = (productsRes.data ?? []) as ProductRecord[];
+  const materials = (materialsRes.data ?? []) as MaterialRecord[];
+
   return (
     <SteelFlowShell>
       <OrdersWorkspace

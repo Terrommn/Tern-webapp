@@ -1,7 +1,6 @@
 import { ClientsDirectory } from "@/components/steelflow/ClientsDirectory";
 import { SteelFlowShell } from "@/components/steelflow/SteelFlowShell";
-import mockClients from "@/data/mock-clients.json";
-import mockOrders from "@/data/mock-orders.json";
+import { createClient } from "@/lib/supabase/server";
 import type { ClientRecord } from "@/types/client";
 import type { OrderRecord } from "@/types/order";
 
@@ -10,10 +9,17 @@ export const metadata = {
   description: "Gestión de clientes y contactos.",
 };
 
-const clients = mockClients as ClientRecord[];
-const orders = mockOrders as OrderRecord[];
+export default async function ClientesPage() {
+  const supabase = await createClient();
 
-export default function ClientesPage() {
+  const [clientsRes, ordersRes] = await Promise.all([
+    supabase.from("clients").select("*"),
+    supabase.from("orders").select("*"),
+  ]);
+
+  const clients = (clientsRes.data ?? []) as ClientRecord[];
+  const orders = (ordersRes.data ?? []) as OrderRecord[];
+
   return (
     <SteelFlowShell>
       <ClientsDirectory clients={clients} orders={orders} />

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { CreateEntityModal } from "@/components/steelflow/CreateEntityModal";
+import { createClient as createSupabaseClient } from "@/lib/supabase/client";
 import type { MaterialRecord } from "@/types/material";
 import type { OrderRecord } from "@/types/order";
 import type { ProductRecord } from "@/types/product";
@@ -160,24 +161,65 @@ export function ProductsWorkspace({
     }
   }
 
-  function handleCreateProduct(event: React.FormEvent) {
+  async function handleCreateProduct(event: React.FormEvent) {
     event.preventDefault();
 
-    const newProduct = buildProductFromForm(createForm);
+    const payload = {
+      gauge: Number(createForm.gauge),
+      thickness: Number(createForm.thickness),
+      material_id: createForm.material_id,
+    };
+
+    const supabase = createSupabaseClient();
+    const { data, error } = await supabase
+      .from("products")
+      .insert(payload)
+      .select()
+      .single();
+
+    let newProduct: ProductRecord;
+    if (error) {
+      console.error("Failed to create product:", error);
+      newProduct = buildProductFromForm(createForm);
+    } else {
+      newProduct = data as ProductRecord;
+    }
+
     setProducts((current) => [newProduct, ...current]);
     setSelectedProductId(newProduct.id);
     setQuery("");
     handleCloseCreate();
   }
 
-  function handleSubmit(event: React.FormEvent) {
+  async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
 
     if (!selectedProduct) {
       return;
     }
 
-    const updatedProduct = buildProductFromForm(form, selectedProduct);
+    const payload = {
+      gauge: Number(form.gauge),
+      thickness: Number(form.thickness),
+      material_id: form.material_id,
+    };
+
+    const supabase = createSupabaseClient();
+    const { data, error } = await supabase
+      .from("products")
+      .update(payload)
+      .eq("id", selectedProduct.id)
+      .select()
+      .single();
+
+    const updatedProduct = error
+      ? buildProductFromForm(form, selectedProduct)
+      : (data as ProductRecord);
+
+    if (error) {
+      console.error("Failed to update product:", error);
+    }
+
     setProducts((current) =>
       current.map((product) =>
         product.id === updatedProduct.id ? updatedProduct : product

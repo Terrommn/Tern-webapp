@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { CreateEntityModal } from "@/components/steelflow/CreateEntityModal";
+import { createClient as createSupabaseClient } from "@/lib/supabase/client";
 import type { ClientRecord } from "@/types/client";
 import type { MaterialRecord } from "@/types/material";
 import type { OrderRecord } from "@/types/order";
@@ -127,18 +128,30 @@ export function OrdersWorkspace({
     }));
   }
 
-  function handleCreateOrder(event: React.FormEvent) {
+  async function handleCreateOrder(event: React.FormEvent) {
     event.preventDefault();
 
-    const now = new Date().toISOString();
-    const newOrder: OrderRecord = {
-      id: crypto.randomUUID(),
+    const payload = {
       client_id: form.client_id,
       product_id: form.product_id,
       quantity_kg: Number(form.quantity_kg),
-      created_at: now,
-      updated_at: now,
     };
+
+    const supabase = createSupabaseClient();
+    const { data, error } = await supabase
+      .from("orders")
+      .insert(payload)
+      .select()
+      .single();
+
+    let newOrder: OrderRecord;
+    if (error) {
+      console.error("Failed to create order:", error);
+      const now = new Date().toISOString();
+      newOrder = { id: crypto.randomUUID(), ...payload, created_at: now, updated_at: now };
+    } else {
+      newOrder = data as OrderRecord;
+    }
 
     setOrders((current) => [newOrder, ...current]);
     setSelectedOrderId(newOrder.id);

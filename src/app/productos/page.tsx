@@ -1,8 +1,6 @@
 import { ProductsWorkspace } from "@/components/steelflow/ProductsWorkspace";
 import { SteelFlowShell } from "@/components/steelflow/SteelFlowShell";
-import mockMaterials from "@/data/mock-materials.json";
-import mockOrders from "@/data/mock-orders.json";
-import mockProducts from "@/data/mock-products.json";
+import { createClient } from "@/lib/supabase/server";
 import type { MaterialRecord } from "@/types/material";
 import type { OrderRecord } from "@/types/order";
 import type { ProductRecord } from "@/types/product";
@@ -12,11 +10,19 @@ export const metadata = {
   description: "Catálogo de productos con flujos de visualización, creación y edición.",
 };
 
-const products = mockProducts as ProductRecord[];
-const materials = mockMaterials as MaterialRecord[];
-const orders = mockOrders as OrderRecord[];
+export default async function ProductosPage() {
+  const supabase = await createClient();
 
-export default function ProductosPage() {
+  const [productsRes, materialsRes, ordersRes] = await Promise.all([
+    supabase.from("products").select("*"),
+    supabase.from("materials").select("*"),
+    supabase.from("orders").select("*"),
+  ]);
+
+  const products = (productsRes.data ?? []) as ProductRecord[];
+  const materials = (materialsRes.data ?? []) as MaterialRecord[];
+  const orders = (ordersRes.data ?? []) as OrderRecord[];
+
   return (
     <SteelFlowShell>
       <ProductsWorkspace
