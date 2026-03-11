@@ -10,6 +10,7 @@ type CreateEntityModalProps = {
   submitLabel: string;
   onClose: () => void;
   children: ReactNode;
+  //comment
 };
 //comment
 export function CreateEntityModal({
