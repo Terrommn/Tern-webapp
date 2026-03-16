@@ -14,6 +14,18 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
+  // Allow login page and auth callback
+  if (pathname === "/login" || pathname.startsWith("/auth")) {
+    return response;
+  }
+
+  // Placeholder auth check — use a cookie as a simple session flag
+  const session = request.cookies.get("steelflow-session");
+  if (!session) {
+    const loginUrl = new URL("/login", request.url);
+    return NextResponse.redirect(loginUrl);
+  }
+
   return response;
 }
 
