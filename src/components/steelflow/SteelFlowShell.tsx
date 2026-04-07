@@ -25,6 +25,11 @@ const NAV_ITEMS = [
     label: "Products",
     icon: "inventory_2",
   },
+  {
+    href: "/simulador",
+    label: "Simulador",
+    icon: "view_in_ar",
+  },
 ] as const;
 
 function isActivePath(pathname: string, href: string) {

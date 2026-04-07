@@ -303,7 +303,7 @@ export default async function SteelFlowProDashboardPage() {
                     return (
                       <tr key={`${order.id}-${order.line_number}`}>
                         <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">
-                          #{order.id}
+                          #{String(order.id).slice(0, 8)}
                         </td>
                         <td className="px-6 py-4">{order.clientName}</td>
                         <td className="px-6 py-4">{order.productName}</td>
