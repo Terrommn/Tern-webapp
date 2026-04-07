@@ -91,9 +91,9 @@ function MovableCube() {
   });
 
   return (
-    <mesh ref={meshRef} position={[0, 0.5, 0]} castShadow>
-      <boxGeometry args={[1, 1, 1]} />
-      <meshStandardMaterial color="#2a4a7f" metalness={0.6} roughness={0.3} />
+    <mesh ref={meshRef} position={[0, 0.9, 0]} castShadow>
+      <boxGeometry args={[1.8, 1.8, 1.8]} />
+      <meshStandardMaterial color="#ffffff" metalness={0.6} roughness={0.3} />
     </mesh>
   );
 }
