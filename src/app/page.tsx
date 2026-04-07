@@ -5,37 +5,34 @@ export default async function SteelFlowProDashboardPage() {
   const supabase = await createClient();
 
   // Fetch all tables in parallel
-  const [ordersRes, clientsRes, productsRes, materialsRes] = await Promise.all([
+  const [ordersRes, clientsRes, productsRes] = await Promise.all([
     supabase.from("orders").select("*").order("created_at", { ascending: false }),
     supabase.from("clients").select("*"),
     supabase.from("products").select("*"),
-    supabase.from("materials").select("*"),
   ]);
 
   const orders = ordersRes.data ?? [];
   const clients = clientsRes.data ?? [];
   const products = productsRes.data ?? [];
-  const materials = materialsRes.data ?? [];
 
   // Build lookup maps
   const clientMap = new Map(clients.map((c) => [c.id, c]));
   const productMap = new Map(products.map((p) => [p.id, p]));
-  const materialMap = new Map(materials.map((m) => [m.id, m]));
 
   // ── Stats ──
   const totalOrders = orders.length;
   const totalClients = clients.length;
   const totalProducts = products.length;
-  const totalWeight = orders.reduce((sum, o) => sum + Number(o.quantity_kg), 0);
+  const totalWeight = orders.reduce((sum, o) => sum + (Number(o.net_weight_ton) || 0), 0);
 
-  // ── Daily flow chart: aggregate quantity by day-of-week ──
+  // ── Daily flow chart: aggregate weight by day-of-week ──
   const dayLabels = ["LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB", "DOM"];
   const dayTotals = new Array(7).fill(0);
   for (const order of orders) {
     if (order.created_at) {
       const dow = new Date(order.created_at).getDay(); // 0=Sun
       const idx = dow === 0 ? 6 : dow - 1; // shift so Mon=0
-      dayTotals[idx] += Number(order.quantity_kg);
+      dayTotals[idx] += Number(order.net_weight_ton) || 0;
     }
   }
   const maxDay = Math.max(...dayTotals, 1);
@@ -45,30 +42,29 @@ export default async function SteelFlowProDashboardPage() {
     value: dayTotals[i],
   }));
 
-  // Previous week comparison (simple: +totalWeight as a percentage placeholder)
+  // Previous week comparison placeholder
   const weightChangePercent = totalWeight > 0 ? "+12.5%" : "0%";
 
-  // ── Status distribution: group orders by weight ranges ──
-  const statusBuckets = {
-    light: 0,   // < 5,000 kg
-    medium: 0,  // 5,000 – 15,000 kg
-    heavy: 0,   // 15,000 – 30,000 kg
-    ultraHeavy: 0, // > 30,000 kg
-  };
+  // ── Status distribution: group orders by status ──
+  const statusCounts: Record<string, number> = {};
   for (const order of orders) {
-    const qty = Number(order.quantity_kg);
-    if (qty < 5000) statusBuckets.light++;
-    else if (qty < 15000) statusBuckets.medium++;
-    else if (qty < 30000) statusBuckets.heavy++;
-    else statusBuckets.ultraHeavy++;
+    const s = order.status ?? "Unknown";
+    statusCounts[s] = (statusCounts[s] ?? 0) + 1;
   }
 
-  const statusItems = [
-    { color: "bg-slate-400", label: "Ligero (<5t)", count: statusBuckets.light },
-    { color: "bg-primary", label: "Medio (5-15t)", count: statusBuckets.medium },
-    { color: "bg-orange-500", label: "Pesado (15-30t)", count: statusBuckets.heavy },
-    { color: "bg-emerald-500", label: "Ultra pesado (>30t)", count: statusBuckets.ultraHeavy },
-  ];
+  const statusColorMap: Record<string, string> = {
+    CUM: "bg-emerald-500",
+    PEN: "bg-primary",
+    PROG: "bg-orange-500",
+  };
+  const defaultColor = "bg-slate-400";
+
+  const statusItems = Object.entries(statusCounts).map(([label, count]) => ({
+    color: statusColorMap[label] ?? defaultColor,
+    label,
+    count,
+  }));
+
   const statusTotal = totalOrders || 1;
   const statusSlices = statusItems.map((item) => ({
     ...item,
@@ -78,45 +74,53 @@ export default async function SteelFlowProDashboardPage() {
   // ── SVG donut offsets ──
   const donutData = statusSlices.map((s) => Math.round((s.count / statusTotal) * 100));
   let donutOffset = 0;
-  const donutCircles = [
-    { className: "stroke-primary", dash: donutData[1] },
-    { className: "stroke-emerald-500", dash: donutData[3] },
-    { className: "stroke-orange-500", dash: donutData[2] },
-    { className: "stroke-slate-400", dash: donutData[0] },
-  ].map((c) => {
-    const circle = { ...c, offset: -donutOffset };
-    donutOffset += c.dash;
+  const strokeColorMap: Record<string, string> = {
+    CUM: "stroke-emerald-500",
+    PEN: "stroke-primary",
+    PROG: "stroke-orange-500",
+  };
+  const donutCircles = statusSlices.map((s, i) => {
+    const circle = {
+      className: strokeColorMap[s.label] ?? "stroke-slate-400",
+      dash: donutData[i],
+      offset: -donutOffset,
+    };
+    donutOffset += donutData[i];
     return circle;
   });
 
-  // ── Recent orders (top 4) ──
+  // ── Recent orders (top 4) ── use composite key
   const recentOrders = orders.slice(0, 4).map((order) => {
     const client = clientMap.get(order.client_id);
     const product = productMap.get(order.product_id);
-    const material = product ? materialMap.get(product.material_id) : undefined;
-    return { ...order, clientName: client?.name ?? "—", productName: material?.name ?? "—", gauge: product?.gauge ?? "—" };
+    return {
+      ...order,
+      clientName: client?.name ?? order.client_id,
+      productName: product ? `G${product.gauge} · ${product.thickness}mm` : "—",
+    };
   });
 
-  // ── Capacity utilisation per client (top 3) ──
-  const clientOrderTotals = new Map<string, number>();
+  // ── Top plants by weight ──
+  const plantTotals = new Map<string, number>();
   for (const order of orders) {
-    clientOrderTotals.set(order.client_id, (clientOrderTotals.get(order.client_id) ?? 0) + Number(order.quantity_kg));
+    const plant = order.plant ?? "Unknown";
+    plantTotals.set(plant, (plantTotals.get(plant) ?? 0) + (Number(order.net_weight_ton) || 0));
   }
-  const capacityItems = clients
-    .filter((c) => c.max_weight && clientOrderTotals.has(c.id))
-    .map((c) => ({
-      name: c.name as string,
-      pct: Math.min(100, Math.round(((clientOrderTotals.get(c.id) ?? 0) / Number(c.max_weight)) * 100)),
-    }))
-    .sort((a, b) => b.pct - a.pct)
-    .slice(0, 3);
+  const capacityItems = [...plantTotals.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([name, weight]) => ({
+      name,
+      weight: Math.round(weight * 100) / 100,
+      pct: Math.min(100, Math.round((weight / (totalWeight || 1)) * 100)),
+    }));
 
   const capacityColors = [
     { bg: "bg-emerald-500", text: "text-emerald-500" },
     { bg: "bg-primary", text: "text-primary" },
     { bg: "bg-orange-500", text: "text-orange-500" },
   ];
-  const capacityIcons = ["settings_suggest", "precision_manufacturing", "package_2"];
+  const capacityIcons = ["factory", "precision_manufacturing", "package_2"];
 
   return (
     <SteelFlowShell>
@@ -139,7 +143,7 @@ export default async function SteelFlowProDashboardPage() {
               { label: "Orders", value: totalOrders, icon: "receipt_long" },
               { label: "Clients", value: totalClients, icon: "groups" },
               { label: "Products", value: totalProducts, icon: "inventory_2" },
-              { label: "Total (T)", value: `${(totalWeight / 1000).toFixed(1)}`, icon: "scale" },
+              { label: "Total (T)", value: `${totalWeight.toFixed(1)}`, icon: "scale" },
             ].map((kpi) => (
               <div
                 key={kpi.label}
@@ -197,7 +201,7 @@ export default async function SteelFlowProDashboardPage() {
               <div className="mb-6 flex items-start justify-between">
                 <div>
                   <h3 className="font-bold text-slate-900 dark:text-slate-100">
-                    Distribución por Peso
+                    Distribución por Estatus
                   </h3>
                   <p className="text-sm text-slate-500 dark:text-slate-400">
                     Pipeline Activo
@@ -279,35 +283,31 @@ export default async function SteelFlowProDashboardPage() {
                     <th className="px-6 py-3">Order ID</th>
                     <th className="px-6 py-3">Cliente</th>
                     <th className="px-6 py-3">Producto</th>
-                    <th className="px-6 py-3">Peso (kg)</th>
-                    <th className="px-6 py-3">Categoría</th>
+                    <th className="px-6 py-3">Peso (T)</th>
+                    <th className="px-6 py-3">Estatus</th>
                     <th className="px-6 py-3">Fecha</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {recentOrders.map((order) => {
-                    const qty = Number(order.quantity_kg);
-                    let statusLabel = "Ligero";
+                    const statusLabel = order.status ?? "—";
                     let statusClass = "bg-slate-200 text-slate-500 dark:bg-slate-800";
-                    if (qty >= 30000) {
-                      statusLabel = "Ultra Pesado";
+                    if (statusLabel === "CUM") {
                       statusClass = "bg-emerald-500/10 text-emerald-500";
-                    } else if (qty >= 15000) {
-                      statusLabel = "Pesado";
-                      statusClass = "bg-orange-500/10 text-orange-500";
-                    } else if (qty >= 5000) {
-                      statusLabel = "Medio";
+                    } else if (statusLabel === "PEN") {
                       statusClass = "bg-primary/10 text-primary";
+                    } else if (statusLabel === "PROG") {
+                      statusClass = "bg-orange-500/10 text-orange-500";
                     }
 
                     return (
-                      <tr key={order.id}>
+                      <tr key={`${order.id}-${order.line_number}`}>
                         <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">
-                          #{order.id.slice(0, 8)}
+                          #{order.id}
                         </td>
                         <td className="px-6 py-4">{order.clientName}</td>
-                        <td className="px-6 py-4">{order.productName} G{order.gauge}</td>
-                        <td className="px-6 py-4">{qty.toLocaleString()}</td>
+                        <td className="px-6 py-4">{order.productName}</td>
+                        <td className="px-6 py-4">{(Number(order.net_weight_ton) || 0).toFixed(2)}</td>
                         <td className="px-6 py-4">
                           <span className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase ${statusClass}`}>
                             {statusLabel}
@@ -416,11 +416,11 @@ export default async function SteelFlowProDashboardPage() {
             </div>
           </div>
 
-          {/* Capacity Utilisation Card */}
+          {/* Weight by Plant Card */}
           <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div className="mb-4 flex items-center justify-between">
               <h3 className="font-bold text-slate-900 dark:text-slate-100">
-                Capacidad por Cliente
+                Peso por Planta
               </h3>
               <span className="relative flex size-2">
                 <span className="absolute inline-flex size-full animate-ping rounded-full bg-red-400 opacity-75" />
@@ -449,12 +449,12 @@ export default async function SteelFlowProDashboardPage() {
                   <span
                     className={`text-xs font-bold ${capacityColors[i]?.text ?? "text-primary"}`}
                   >
-                    {item.pct}%
+                    {item.weight}T
                   </span>
                 </div>
               ))}
               {capacityItems.length === 0 && (
-                <p className="text-sm text-slate-400">Sin datos de capacidad.</p>
+                <p className="text-sm text-slate-400">Sin datos de plantas.</p>
               )}
             </div>
           </div>

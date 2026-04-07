@@ -8,15 +8,7 @@ import type { OrderRecord } from "@/types/order";
 
 type ClientFormState = {
   name: string;
-  max_weight: string;
-  min_weight: string;
-  max_length: string;
-  max_width: string;
-  max_height: string;
-  orientation: string;
-  max_rolls: string;
-  internal_diameter: string;
-  external_diameter: string;
+  transport_type: string;
 };
 
 function formatDate(value: string | null) {
@@ -31,32 +23,10 @@ function formatDate(value: string | null) {
   }).format(new Date(value));
 }
 
-function formatMetric(value: number | null, suffix: string) {
-  return value === null ? "Not set" : `${value}${suffix}`;
-}
-
-function parseNullableNumber(value: string) {
-  const trimmed = value.trim();
-  return trimmed === "" ? null : Number(trimmed);
-}
-
-function parseNullableInteger(value: string) {
-  const trimmed = value.trim();
-  return trimmed === "" ? null : Number.parseInt(trimmed, 10);
-}
-
 function createClientFormState(): ClientFormState {
   return {
     name: "",
-    max_weight: "",
-    min_weight: "",
-    max_length: "",
-    max_width: "",
-    max_height: "",
-    orientation: "",
-    max_rolls: "",
-    internal_diameter: "",
-    external_diameter: "",
+    transport_type: "CAMION",
   };
 }
 
@@ -81,6 +51,15 @@ export function ClientsDirectory({
     [orders]
   );
 
+  const weightByClient = useMemo(
+    () =>
+      orders.reduce<Record<string, number>>((acc, order) => {
+        acc[order.client_id] = (acc[order.client_id] ?? 0) + (Number(order.net_weight_ton) || 0);
+        return acc;
+      }, {}),
+    [orders]
+  );
+
   const filteredClients = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
 
@@ -89,25 +68,15 @@ export function ClientsDirectory({
     }
 
     return clients.filter((client) =>
-      [client.id, client.name, client.orientation ?? ""].some((value) =>
+      [client.id, client.name, client.transport_type ?? ""].some((value) =>
         value.toLowerCase().includes(normalizedQuery)
       )
     );
   }, [clients, query]);
 
-  const avgMaxWeight = Math.round(
-    clients
-      .filter((client) => client.max_weight !== null)
-      .reduce((sum, client) => sum + (client.max_weight ?? 0), 0) /
-      Math.max(
-        1,
-        clients.filter((client) => client.max_weight !== null).length
-      )
-  );
-  const verticalClients = clients.filter(
-    (client) => client.orientation === "vertical"
-  ).length;
   const totalOrders = orders.length;
+  const transportTypes = new Set(clients.map((c) => c.transport_type).filter(Boolean)).size;
+  const totalWeight = orders.reduce((sum, o) => sum + (Number(o.net_weight_ton) || 0), 0);
 
   function handleChange<K extends keyof ClientFormState>(
     key: K,
@@ -134,15 +103,7 @@ export function ClientsDirectory({
 
     const payload = {
       name: form.name.trim(),
-      max_weight: parseNullableNumber(form.max_weight),
-      min_weight: parseNullableNumber(form.min_weight),
-      max_length: parseNullableNumber(form.max_length),
-      max_width: parseNullableNumber(form.max_width),
-      max_height: parseNullableNumber(form.max_height),
-      orientation: form.orientation.trim() || null,
-      max_rolls: parseNullableInteger(form.max_rolls),
-      internal_diameter: parseNullableNumber(form.internal_diameter),
-      external_diameter: parseNullableNumber(form.external_diameter),
+      transport_type: form.transport_type.trim() || null,
     };
 
     const supabase = createSupabaseClient();
@@ -154,9 +115,14 @@ export function ClientsDirectory({
 
     if (error) {
       console.error("Failed to create client:", error);
-      // Optimistic fallback so the UI still updates
       const now = new Date().toISOString();
-      const fallback: ClientRecord = { id: crypto.randomUUID(), ...payload, created_at: now, updated_at: now };
+      const fallback: ClientRecord = {
+        id: form.name.trim(),
+        ...payload,
+        transport_type: payload.transport_type,
+        created_at: now,
+        updated_at: now,
+      };
       setClients((current) => [fallback, ...current]);
     } else {
       setClients((current) => [data as ClientRecord, ...current]);
@@ -174,11 +140,11 @@ export function ClientsDirectory({
             Clients
           </p>
           <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white">
-            Shipping and handling constraints by client
+            Client directory with transport and order data
           </h1>
           <p className="max-w-2xl text-sm text-slate-500 dark:text-slate-400">
-            Every field shown here matches the `clients` schema directly, so this
-            screen is ready to map cleanly to Supabase rows.
+            Clients linked to their orders and transport type from the live
+            Supabase database.
           </p>
         </div>
 
@@ -193,18 +159,18 @@ export function ClientsDirectory({
           </div>
           <div className="rounded-2xl bg-slate-50 px-4 py-3 dark:bg-slate-900">
             <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
-              Avg max weight
+              Total weight
             </p>
             <p className="mt-1 text-2xl font-black text-slate-900 dark:text-white">
-              {avgMaxWeight}kg
+              {totalWeight.toFixed(1)}T
             </p>
           </div>
           <div className="rounded-2xl bg-slate-50 px-4 py-3 dark:bg-slate-900">
             <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
-              Vertical
+              Transport types
             </p>
             <p className="mt-1 text-2xl font-black text-slate-900 dark:text-white">
-              {verticalClients}
+              {transportTypes}
             </p>
           </div>
           <div className="rounded-2xl bg-slate-50 px-4 py-3 dark:bg-slate-900">
@@ -222,10 +188,10 @@ export function ClientsDirectory({
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="space-y-1">
             <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-              Search client rules
+              Search clients
             </h2>
             <p className="text-sm text-slate-500 dark:text-slate-400">
-              Search by UUID, client name, or orientation.
+              Search by ID, name, or transport type.
             </p>
           </div>
 
@@ -263,6 +229,7 @@ export function ClientsDirectory({
             "steelflow-card-hover--br",
           ][index % 4];
           const linkedOrders = orderCountByClient[client.id] ?? 0;
+          const clientWeight = weightByClient[client.id] ?? 0;
 
           return (
             <article
@@ -278,7 +245,7 @@ export function ClientsDirectory({
                     {client.name}
                   </h3>
                   <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                    Orientation: {client.orientation ?? "Not set"}
+                    Transport: {client.transport_type ?? "Not set"}
                   </p>
                 </div>
 
@@ -290,44 +257,23 @@ export function ClientsDirectory({
               <div className="mt-6 grid grid-cols-2 gap-3">
                 <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900">
                   <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
-                    Weight range
+                    Total weight
                   </p>
                   <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">
-                    {formatMetric(client.min_weight, "kg")} to{" "}
-                    {formatMetric(client.max_weight, "kg")}
+                    {clientWeight.toFixed(2)}T
                   </p>
                 </div>
                 <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900">
                   <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
-                    Max rolls
+                    Transport
                   </p>
                   <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">
-                    {client.max_rolls ?? "Not set"}
+                    {client.transport_type ?? "N/A"}
                   </p>
                 </div>
               </div>
 
               <div className="mt-6 space-y-3 text-sm text-slate-500 dark:text-slate-400">
-                <p>
-                  <span className="font-semibold text-slate-900 dark:text-white">
-                    Dimensions:
-                  </span>{" "}
-                  {formatMetric(client.max_length, "mm")} x{" "}
-                  {formatMetric(client.max_width, "mm")} x{" "}
-                  {formatMetric(client.max_height, "mm")}
-                </p>
-                <p>
-                  <span className="font-semibold text-slate-900 dark:text-white">
-                    Internal diameter:
-                  </span>{" "}
-                  {formatMetric(client.internal_diameter, "mm")}
-                </p>
-                <p>
-                  <span className="font-semibold text-slate-900 dark:text-white">
-                    External diameter:
-                  </span>{" "}
-                  {formatMetric(client.external_diameter, "mm")}
-                </p>
                 <p>
                   <span className="font-semibold text-slate-900 dark:text-white">
                     Updated:
@@ -346,13 +292,13 @@ export function ClientsDirectory({
             No clients found
           </p>
           <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-            Try another search term to match your client constraints dataset.
+            Try another search term.
           </p>
         </section>
       )}
 
       <CreateEntityModal
-        description="Create a client row that matches the `clients` table columns."
+        description="Create a client row in the clients table."
         formId="create-client-form"
         open={isCreateOpen}
         submitLabel="Create client"
@@ -360,13 +306,13 @@ export function ClientsDirectory({
         onClose={handleCloseCreate}
       >
         <form
-          className="grid grid-cols-1 gap-4 sm:grid-cols-2"
+          className="grid grid-cols-1 gap-4"
           id="create-client-form"
           onSubmit={handleCreateClient}
         >
-          <label className="flex flex-col gap-2 text-sm sm:col-span-2">
+          <label className="flex flex-col gap-2 text-sm">
             <span className="font-semibold text-slate-700 dark:text-slate-300">
-              Name
+              Name / ID
             </span>
             <input
               className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
@@ -376,45 +322,19 @@ export function ClientsDirectory({
             />
           </label>
 
-          {[
-            ["max_weight", "Max weight"],
-            ["min_weight", "Min weight"],
-            ["max_length", "Max length"],
-            ["max_width", "Max width"],
-            ["max_height", "Max height"],
-            ["max_rolls", "Max rolls"],
-            ["internal_diameter", "Internal diameter"],
-            ["external_diameter", "External diameter"],
-          ].map(([key, label]) => (
-            <label className="flex flex-col gap-2 text-sm" key={key}>
-              <span className="font-semibold text-slate-700 dark:text-slate-300">
-                {label}
-              </span>
-              <input
-                className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
-                step="0.01"
-                type="number"
-                value={form[key as keyof ClientFormState]}
-                onChange={(event) =>
-                  handleChange(
-                    key as keyof ClientFormState,
-                    event.target.value as never
-                  )
-                }
-              />
-            </label>
-          ))}
-
-          <label className="flex flex-col gap-2 text-sm sm:col-span-2">
+          <label className="flex flex-col gap-2 text-sm">
             <span className="font-semibold text-slate-700 dark:text-slate-300">
-              Orientation
+              Transport type
             </span>
-            <input
+            <select
               className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
-              placeholder="vertical or horizontal"
-              value={form.orientation}
-              onChange={(event) => handleChange("orientation", event.target.value)}
-            />
+              value={form.transport_type}
+              onChange={(event) => handleChange("transport_type", event.target.value)}
+            >
+              <option value="CAMION">CAMION</option>
+              <option value="TREN">TREN</option>
+              <option value="BARCO">BARCO</option>
+            </select>
           </label>
         </form>
       </CreateEntityModal>

@@ -3,14 +3,25 @@
 import { useEffect, useMemo, useState } from "react";
 import { CreateEntityModal } from "@/components/steelflow/CreateEntityModal";
 import { createClient as createSupabaseClient } from "@/lib/supabase/client";
-import type { MaterialRecord } from "@/types/material";
+import type { ClientRecord } from "@/types/client";
 import type { OrderRecord } from "@/types/order";
 import type { ProductRecord } from "@/types/product";
 
 type ProductFormState = {
   gauge: string;
   thickness: string;
-  material_id: string;
+  client_id: string;
+  orientation: string;
+  process: string;
+  finish: string;
+  form: string;
+  width: string;
+  min_weight: string;
+  max_weight: string;
+  internal_diameter: string;
+  external_diameter: string;
+  part_number: string;
+  packaging_code: string;
 };
 
 function formatDate(value: string | null) {
@@ -26,39 +37,34 @@ function formatDate(value: string | null) {
 }
 
 function createFormState(
-  materials: MaterialRecord[],
+  clients: ClientRecord[],
   product?: ProductRecord
 ): ProductFormState {
   return {
     gauge: product ? String(product.gauge) : "",
     thickness: product ? String(product.thickness) : "",
-    material_id: product?.material_id ?? materials[0]?.id ?? "",
-  };
-}
-
-function buildProductFromForm(
-  form: ProductFormState,
-  existing?: ProductRecord
-): ProductRecord {
-  const now = new Date().toISOString();
-
-  return {
-    id: existing?.id ?? crypto.randomUUID(),
-    gauge: Number(form.gauge),
-    thickness: Number(form.thickness),
-    material_id: form.material_id,
-    created_at: existing?.created_at ?? now,
-    updated_at: now,
+    client_id: product?.client_id ?? clients[0]?.id ?? "",
+    orientation: product?.orientation ?? "",
+    process: product?.process ?? "",
+    finish: product?.finish ?? "",
+    form: product?.form ?? "",
+    width: product?.width != null ? String(product.width) : "",
+    min_weight: product?.min_weight != null ? String(product.min_weight) : "",
+    max_weight: product?.max_weight != null ? String(product.max_weight) : "",
+    internal_diameter: product?.internal_diameter != null ? String(product.internal_diameter) : "",
+    external_diameter: product?.external_diameter != null ? String(product.external_diameter) : "",
+    part_number: product?.part_number ?? "",
+    packaging_code: product?.packaging_code ?? "",
   };
 }
 
 export function ProductsWorkspace({
   initialProducts,
-  materials,
+  clients,
   orders,
 }: {
   initialProducts: ProductRecord[];
-  materials: MaterialRecord[];
+  clients: ClientRecord[];
   orders: OrderRecord[];
 }) {
   const [products, setProducts] = useState(initialProducts);
@@ -67,16 +73,16 @@ export function ProductsWorkspace({
     initialProducts[0]?.id ?? ""
   );
   const [form, setForm] = useState<ProductFormState>(
-    createFormState(materials, initialProducts[0])
+    createFormState(clients, initialProducts[0])
   );
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [createForm, setCreateForm] = useState<ProductFormState>(
-    createFormState(materials)
+    createFormState(clients)
   );
 
-  const materialMap = useMemo(
-    () => new Map(materials.map((material) => [material.id, material])),
-    [materials]
+  const clientMap = useMemo(
+    () => new Map(clients.map((c) => [c.id, c])),
+    [clients]
   );
   const orderCountByProduct = useMemo(
     () =>
@@ -95,24 +101,26 @@ export function ProductsWorkspace({
     }
 
     return products.filter((product) => {
-      const material = materialMap.get(product.material_id);
       return [
         product.id,
-        material?.name ?? "",
         `${product.gauge}`,
         `${product.thickness}`,
+        product.process ?? "",
+        product.finish ?? "",
+        product.part_number ?? "",
+        product.client_id ?? "",
       ].some((value) => value.toLowerCase().includes(normalizedQuery));
     });
-  }, [products, query, materialMap]);
+  }, [products, query]);
 
   const selectedProduct =
     products.find((product) => product.id === selectedProductId) ?? products[0];
 
   useEffect(() => {
     if (selectedProduct) {
-      setForm(createFormState(materials, selectedProduct));
+      setForm(createFormState(clients, selectedProduct));
     }
-  }, [selectedProduct, materials]);
+  }, [selectedProduct, clients]);
 
   useEffect(() => {
     if (!filteredProducts.some((product) => product.id === selectedProductId)) {
@@ -141,23 +149,23 @@ export function ProductsWorkspace({
   }
 
   function handleStartCreate() {
-    setCreateForm(createFormState(materials));
+    setCreateForm(createFormState(clients));
     setIsCreateOpen(true);
   }
 
   function handleCloseCreate() {
     setIsCreateOpen(false);
-    setCreateForm(createFormState(materials));
+    setCreateForm(createFormState(clients));
   }
 
   function handleStartEdit(product: ProductRecord) {
     setSelectedProductId(product.id);
-    setForm(createFormState(materials, product));
+    setForm(createFormState(clients, product));
   }
 
   function handleCancel() {
     if (selectedProduct) {
-      setForm(createFormState(materials, selectedProduct));
+      setForm(createFormState(clients, selectedProduct));
     }
   }
 
@@ -165,9 +173,20 @@ export function ProductsWorkspace({
     event.preventDefault();
 
     const payload = {
-      gauge: Number(createForm.gauge),
+      gauge: createForm.gauge,
       thickness: Number(createForm.thickness),
-      material_id: createForm.material_id,
+      client_id: createForm.client_id,
+      orientation: createForm.orientation || null,
+      process: createForm.process || null,
+      finish: createForm.finish || null,
+      form: createForm.form || null,
+      width: createForm.width ? Number(createForm.width) : null,
+      min_weight: createForm.min_weight ? Number(createForm.min_weight) : null,
+      max_weight: createForm.max_weight ? Number(createForm.max_weight) : null,
+      internal_diameter: createForm.internal_diameter ? Number(createForm.internal_diameter) : null,
+      external_diameter: createForm.external_diameter ? Number(createForm.external_diameter) : null,
+      part_number: createForm.part_number || null,
+      packaging_code: createForm.packaging_code || null,
     };
 
     const supabase = createSupabaseClient();
@@ -180,7 +199,22 @@ export function ProductsWorkspace({
     let newProduct: ProductRecord;
     if (error) {
       console.error("Failed to create product:", error);
-      newProduct = buildProductFromForm(createForm);
+      const now = new Date().toISOString();
+      newProduct = {
+        id: crypto.randomUUID(),
+        ...payload,
+        oiling: null,
+        flatness: null,
+        consignee: null,
+        grade_pn: null,
+        width_pn: null,
+        pieces_per_package: null,
+        shipping_packaging: null,
+        max_pallet_width: null,
+        min_lot: null,
+        created_at: now,
+        updated_at: now,
+      };
     } else {
       newProduct = data as ProductRecord;
     }
@@ -199,9 +233,20 @@ export function ProductsWorkspace({
     }
 
     const payload = {
-      gauge: Number(form.gauge),
+      gauge: form.gauge,
       thickness: Number(form.thickness),
-      material_id: form.material_id,
+      client_id: form.client_id,
+      orientation: form.orientation || null,
+      process: form.process || null,
+      finish: form.finish || null,
+      form: form.form || null,
+      width: form.width ? Number(form.width) : null,
+      min_weight: form.min_weight ? Number(form.min_weight) : null,
+      max_weight: form.max_weight ? Number(form.max_weight) : null,
+      internal_diameter: form.internal_diameter ? Number(form.internal_diameter) : null,
+      external_diameter: form.external_diameter ? Number(form.external_diameter) : null,
+      part_number: form.part_number || null,
+      packaging_code: form.packaging_code || null,
     };
 
     const supabase = createSupabaseClient();
@@ -212,13 +257,13 @@ export function ProductsWorkspace({
       .select()
       .single();
 
-    const updatedProduct = error
-      ? buildProductFromForm(form, selectedProduct)
-      : (data as ProductRecord);
-
     if (error) {
       console.error("Failed to update product:", error);
     }
+
+    const updatedProduct = error
+      ? { ...selectedProduct, ...payload, updated_at: new Date().toISOString() }
+      : (data as ProductRecord);
 
     setProducts((current) =>
       current.map((product) =>
@@ -226,13 +271,13 @@ export function ProductsWorkspace({
       )
     );
     setSelectedProductId(updatedProduct.id);
-    setForm(createFormState(materials, updatedProduct));
+    setForm(createFormState(clients, updatedProduct));
   }
 
-  const avgThickness = (
-    products.reduce((sum, product) => sum + product.thickness, 0) / products.length
-  ).toFixed(2);
-  const uniqueMaterials = new Set(products.map((product) => product.material_id)).size;
+  const avgThickness = products.length
+    ? (products.reduce((sum, product) => sum + product.thickness, 0) / products.length).toFixed(2)
+    : "0";
+  const uniqueClients = new Set(products.map((p) => p.client_id)).size;
   const linkedOrders = orders.length;
 
   return (
@@ -244,12 +289,11 @@ export function ProductsWorkspace({
               Products
             </p>
             <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white md:text-4xl">
-              Product definitions aligned to the `products` table
+              Product catalog with specifications
             </h1>
             <p className="max-w-3xl text-sm leading-6 text-slate-500 dark:text-slate-400">
-              Products now store only `gauge`, `thickness`, and `material_id`,
-              while display names and usage summaries are resolved from related
-              materials and orders.
+              Products store gauge, thickness, weight constraints, dimensions,
+              and packaging details from the live Supabase database.
             </p>
           </div>
 
@@ -283,10 +327,10 @@ export function ProductsWorkspace({
         </div>
         <div className="steelflow-card-hover steelflow-card-hover--tr rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-950">
           <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">
-            Materials in use
+            Linked clients
           </p>
           <p className="mt-3 text-4xl font-black text-slate-900 dark:text-white">
-            {uniqueMaterials}
+            {uniqueClients}
           </p>
         </div>
         <div className="steelflow-card-hover steelflow-card-hover--bl rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-950">
@@ -316,7 +360,7 @@ export function ProductsWorkspace({
                   Browse products
                 </h2>
                 <p className="text-sm text-slate-500 dark:text-slate-400">
-                  Search by UUID, material, gauge, or thickness.
+                  Search by ID, gauge, thickness, process, finish, or part number.
                 </p>
               </div>
 
@@ -337,7 +381,6 @@ export function ProductsWorkspace({
 
           <div className="grid grid-cols-1 gap-5 2xl:grid-cols-2">
             {filteredProducts.map((product, index) => {
-              const material = materialMap.get(product.material_id);
               const tiltClass = [
                 "steelflow-card-hover--tl",
                 "steelflow-card-hover--tr",
@@ -367,10 +410,10 @@ export function ProductsWorkspace({
                           {product.id}
                         </p>
                         <h3 className="mt-2 text-xl font-black text-slate-900 dark:text-white">
-                          {material?.name ?? "Unknown material"}
+                          G{product.gauge} · {product.thickness}mm
                         </h3>
                         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                          Gauge {product.gauge} • Thickness {product.thickness}mm
+                          {product.process ?? "N/A"} · {product.finish ?? "N/A"} · {product.form ?? "N/A"}
                         </p>
                       </div>
 
@@ -382,41 +425,20 @@ export function ProductsWorkspace({
                     <div className="grid grid-cols-2 gap-3">
                       <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900">
                         <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
-                          Gauge
+                          Weight range
                         </p>
-                        <p className="mt-2 text-xl font-black text-slate-900 dark:text-white">
-                          {product.gauge}
+                        <p className="mt-2 text-sm font-black text-slate-900 dark:text-white">
+                          {product.min_weight ?? "—"} – {product.max_weight ?? "—"}T
                         </p>
                       </div>
                       <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900">
                         <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
-                          Thickness
+                          Width
                         </p>
-                        <p className="mt-2 text-xl font-black text-slate-900 dark:text-white">
-                          {product.thickness}mm
+                        <p className="mt-2 text-sm font-black text-slate-900 dark:text-white">
+                          {product.width ?? "N/A"}mm
                         </p>
                       </div>
-                    </div>
-
-                    <div className="space-y-2 text-sm text-slate-500 dark:text-slate-400">
-                      <p>
-                        <span className="font-semibold text-slate-900 dark:text-white">
-                          Material id:
-                        </span>{" "}
-                        {product.material_id}
-                      </p>
-                      <p>
-                        <span className="font-semibold text-slate-900 dark:text-white">
-                          Created:
-                        </span>{" "}
-                        {formatDate(product.created_at)}
-                      </p>
-                      <p>
-                        <span className="font-semibold text-slate-900 dark:text-white">
-                          Updated:
-                        </span>{" "}
-                        {formatDate(product.updated_at)}
-                      </p>
                     </div>
                   </div>
                 </button>
@@ -446,29 +468,27 @@ export function ProductsWorkspace({
                 Edit
               </p>
               <h2 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">
-                {selectedProduct ? "Product row" : "Edit product"}
+                {selectedProduct ? "Product details" : "Edit product"}
               </h2>
               <p className="text-sm text-slate-500 dark:text-slate-400">
                 {selectedProduct
-                  ? `Selected ${selectedProduct.id} • Updated ${formatDate(
-                      selectedProduct.updated_at
-                    )}`
+                  ? `Selected ${selectedProduct.id} · Updated ${formatDate(selectedProduct.updated_at)}`
                   : "Select a product card to edit it."}
               </p>
             </div>
 
             <label className="flex flex-col gap-2 text-sm">
               <span className="font-semibold text-slate-700 dark:text-slate-300">
-                Material
+                Client
               </span>
               <select
                 className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
-                value={form.material_id}
-                onChange={(event) => handleChange("material_id", event.target.value)}
+                value={form.client_id}
+                onChange={(event) => handleChange("client_id", event.target.value)}
               >
-                {materials.map((material) => (
-                  <option key={material.id} value={material.id}>
-                    {material.name}
+                {clients.map((client) => (
+                  <option key={client.id} value={client.id}>
+                    {client.name}
                   </option>
                 ))}
               </select>
@@ -481,10 +501,7 @@ export function ProductsWorkspace({
                 </span>
                 <input
                   className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
-                  min="0"
                   required
-                  step="0.01"
-                  type="number"
                   value={form.gauge}
                   onChange={(event) => handleChange("gauge", event.target.value)}
                 />
@@ -492,7 +509,7 @@ export function ProductsWorkspace({
 
               <label className="flex flex-col gap-2 text-sm">
                 <span className="font-semibold text-slate-700 dark:text-slate-300">
-                  Thickness
+                  Thickness (mm)
                 </span>
                 <input
                   className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
@@ -502,6 +519,39 @@ export function ProductsWorkspace({
                   type="number"
                   value={form.thickness}
                   onChange={(event) => handleChange("thickness", event.target.value)}
+                />
+              </label>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <label className="flex flex-col gap-2 text-sm">
+                <span className="font-semibold text-slate-700 dark:text-slate-300">
+                  Process
+                </span>
+                <input
+                  className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+                  value={form.process}
+                  onChange={(event) => handleChange("process", event.target.value)}
+                />
+              </label>
+              <label className="flex flex-col gap-2 text-sm">
+                <span className="font-semibold text-slate-700 dark:text-slate-300">
+                  Finish
+                </span>
+                <input
+                  className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+                  value={form.finish}
+                  onChange={(event) => handleChange("finish", event.target.value)}
+                />
+              </label>
+              <label className="flex flex-col gap-2 text-sm">
+                <span className="font-semibold text-slate-700 dark:text-slate-300">
+                  Form
+                </span>
+                <input
+                  className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+                  value={form.form}
+                  onChange={(event) => handleChange("form", event.target.value)}
                 />
               </label>
             </div>
@@ -526,7 +576,7 @@ export function ProductsWorkspace({
       </section>
 
       <CreateEntityModal
-        description="Create a product row that matches the `products` schema with `gauge`, `thickness`, and `material_id`."
+        description="Create a product with gauge, thickness, weight constraints, and packaging details."
         formId="create-product-form"
         open={isCreateOpen}
         submitLabel="Create product"
@@ -540,18 +590,16 @@ export function ProductsWorkspace({
         >
           <label className="flex flex-col gap-2 text-sm sm:col-span-2">
             <span className="font-semibold text-slate-700 dark:text-slate-300">
-              Material
+              Client
             </span>
             <select
               className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
-              value={createForm.material_id}
-              onChange={(event) =>
-                handleCreateChange("material_id", event.target.value)
-              }
+              value={createForm.client_id}
+              onChange={(event) => handleCreateChange("client_id", event.target.value)}
             >
-              {materials.map((material) => (
-                <option key={material.id} value={material.id}>
-                  {material.name}
+              {clients.map((client) => (
+                <option key={client.id} value={client.id}>
+                  {client.name}
                 </option>
               ))}
             </select>
@@ -563,10 +611,7 @@ export function ProductsWorkspace({
             </span>
             <input
               className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
-              min="0"
               required
-              step="0.01"
-              type="number"
               value={createForm.gauge}
               onChange={(event) => handleCreateChange("gauge", event.target.value)}
             />
@@ -574,7 +619,7 @@ export function ProductsWorkspace({
 
           <label className="flex flex-col gap-2 text-sm">
             <span className="font-semibold text-slate-700 dark:text-slate-300">
-              Thickness
+              Thickness (mm)
             </span>
             <input
               className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
@@ -583,9 +628,33 @@ export function ProductsWorkspace({
               step="0.01"
               type="number"
               value={createForm.thickness}
-              onChange={(event) =>
-                handleCreateChange("thickness", event.target.value)
-              }
+              onChange={(event) => handleCreateChange("thickness", event.target.value)}
+            />
+          </label>
+
+          <label className="flex flex-col gap-2 text-sm">
+            <span className="font-semibold text-slate-700 dark:text-slate-300">
+              Min weight (T)
+            </span>
+            <input
+              className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+              step="0.01"
+              type="number"
+              value={createForm.min_weight}
+              onChange={(event) => handleCreateChange("min_weight", event.target.value)}
+            />
+          </label>
+
+          <label className="flex flex-col gap-2 text-sm">
+            <span className="font-semibold text-slate-700 dark:text-slate-300">
+              Max weight (T)
+            </span>
+            <input
+              className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+              step="0.01"
+              type="number"
+              value={createForm.max_weight}
+              onChange={(event) => handleCreateChange("max_weight", event.target.value)}
             />
           </label>
         </form>

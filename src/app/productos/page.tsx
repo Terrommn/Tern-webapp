@@ -1,7 +1,7 @@
 import { ProductsWorkspace } from "@/components/steelflow/ProductsWorkspace";
 import { SteelFlowShell } from "@/components/steelflow/SteelFlowShell";
 import { createClient } from "@/lib/supabase/server";
-import type { MaterialRecord } from "@/types/material";
+import type { ClientRecord } from "@/types/client";
 import type { OrderRecord } from "@/types/order";
 import type { ProductRecord } from "@/types/product";
 
@@ -13,21 +13,21 @@ export const metadata = {
 export default async function ProductosPage() {
   const supabase = await createClient();
 
-  const [productsRes, materialsRes, ordersRes] = await Promise.all([
+  const [productsRes, clientsRes, ordersRes] = await Promise.all([
     supabase.from("products").select("*"),
-    supabase.from("materials").select("*"),
+    supabase.from("clients").select("*"),
     supabase.from("orders").select("*"),
   ]);
 
   const products = (productsRes.data ?? []) as ProductRecord[];
-  const materials = (materialsRes.data ?? []) as MaterialRecord[];
+  const clients = (clientsRes.data ?? []) as ClientRecord[];
   const orders = (ordersRes.data ?? []) as OrderRecord[];
 
   return (
     <SteelFlowShell>
       <ProductsWorkspace
         initialProducts={products}
-        materials={materials}
+        clients={clients}
         orders={orders}
       />
     </SteelFlowShell>

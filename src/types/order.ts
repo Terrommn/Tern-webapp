@@ -1,8 +1,21 @@
 export type OrderRecord = {
-  id: string;
+  id: number;
+  status: string;
   client_id: string;
-  product_id: string;
-  quantity_kg: number;
+  consignee: string;
+  purchase_order: number;
+  plant: string;
   created_at: string | null;
+  dispatched_at: string | null;
+  line_number: number;
+  product_id: string;
+  net_weight_ton: number;
+  gross_weight_ton: number;
+  width_mm: number;
+  length_mm: number;
+  thickness_mm: number;
+  ofa_id: number;
+  pallet_id: string;
+  pallet_date: string | null;
   updated_at: string | null;
 };
