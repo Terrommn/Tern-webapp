@@ -157,13 +157,13 @@ function UnitySplash({ onComplete }: { onComplete: () => void }) {
         </div>
       ) : (
         <div className="flex flex-col items-center gap-4">
-          <span className="material-symbols-outlined animate-spin text-4xl text-[#1152d4]">
+          <span className="material-symbols-outlined animate-spin text-4xl text-[#d41111]">
             progress_activity
           </span>
           <div className="w-48">
             <div className="h-1.5 w-full rounded-full bg-slate-800">
               <div
-                className="h-full rounded-full bg-[#1152d4] transition-all duration-300"
+                className="h-full rounded-full bg-[#d41111] transition-all duration-300"
                 style={{ width: `${progress}%` }}
               />
             </div>

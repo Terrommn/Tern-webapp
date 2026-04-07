@@ -23,13 +23,13 @@ function GridBackground() {
         className="absolute inset-0 opacity-[0.04]"
         style={{
           backgroundImage:
-            "linear-gradient(rgba(17,82,212,.6) 1px, transparent 1px), linear-gradient(90deg, rgba(17,82,212,.6) 1px, transparent 1px)",
+            "linear-gradient(rgba(212,17,17,.6) 1px, transparent 1px), linear-gradient(90deg, rgba(212,17,17,.6) 1px, transparent 1px)",
           backgroundSize: "60px 60px",
         }}
       />
       {/* Radial glow */}
-      <div className="absolute left-1/2 top-1/3 -translate-x-1/2 -translate-y-1/2 h-[600px] w-[600px] rounded-full bg-[#1152d4]/[0.07] blur-[120px]" />
-      <div className="absolute right-0 bottom-0 h-[400px] w-[400px] rounded-full bg-[#1152d4]/[0.04] blur-[100px]" />
+      <div className="absolute left-1/2 top-1/3 -translate-x-1/2 -translate-y-1/2 h-[600px] w-[600px] rounded-full bg-[#d41111]/[0.07] blur-[120px]" />
+      <div className="absolute right-0 bottom-0 h-[400px] w-[400px] rounded-full bg-[#d41111]/[0.04] blur-[100px]" />
     </div>
   );
 }
@@ -58,7 +58,7 @@ function FloatingParticles() {
       {particles.map((p) => (
         <div
           key={p.id}
-          className="absolute rounded-full bg-[#1152d4]/20 animate-pulse"
+          className="absolute rounded-full bg-[#d41111]/20 animate-pulse"
           style={{
             left: `${p.x}%`,
             top: `${p.y}%`,
@@ -78,7 +78,7 @@ function ScanLine() {
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden">
       <div
-        className="absolute left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-[#1152d4]/30 to-transparent"
+        className="absolute left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-[#d41111]/30 to-transparent"
         style={{
           animation: "scanline 6s ease-in-out infinite",
         }}
@@ -129,8 +129,8 @@ export default function LoginPage() {
           {/* Logo */}
           <div className="mb-8 flex items-center gap-3">
             <div className="relative flex items-center justify-center">
-              <div className="absolute inset-0 rounded-xl bg-[#1152d4]/30 blur-xl" />
-              <div className="relative flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-[#1152d4] to-[#0d3fa6] shadow-lg shadow-[#1152d4]/25">
+              <div className="absolute inset-0 rounded-xl bg-[#d41111]/30 blur-xl" />
+              <div className="relative flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-[#d41111] to-[#a60d0d] shadow-lg shadow-[#d41111]/25">
                 <span className="material-symbols-outlined text-3xl text-white">
                   precision_manufacturing
                 </span>
@@ -140,14 +140,14 @@ export default function LoginPage() {
               <h1 className="text-2xl font-black tracking-tight text-white">
                 SteelFlow
               </h1>
-              <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#1152d4]">
+              <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#d41111]">
                 Pro
               </p>
             </div>
           </div>
 
           {/* Headline */}
-          <div className="inline-flex items-center gap-2 rounded-full border border-[#1152d4]/20 bg-[#1152d4]/10 px-4 py-1.5 text-xs font-semibold text-[#5b8def] mb-5">
+          <div className="inline-flex items-center gap-2 rounded-full border border-[#d41111]/20 bg-[#d41111]/10 px-4 py-1.5 text-xs font-semibold text-[#ef5b5b] mb-5">
             <Shield className="h-3.5 w-3.5" />
             Acceso Industrial Seguro
           </div>
@@ -155,7 +155,7 @@ export default function LoginPage() {
           <h2 className="text-3xl font-black leading-tight text-white sm:text-4xl lg:text-[2.75rem]">
             Control total de tus
             <br />
-            <span className="bg-gradient-to-r from-[#1152d4] to-[#5b8def] bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-[#d41111] to-[#ef5b5b] bg-clip-text text-transparent">
               operaciones de acero
             </span>
           </h2>
@@ -173,9 +173,9 @@ export default function LoginPage() {
             ].map((stat) => (
               <div
                 key={stat.label}
-                className="group rounded-xl border border-[#282e39] bg-[#1c1f27]/80 p-4 backdrop-blur transition-all duration-300 hover:border-[#1152d4]/30 hover:bg-[#1c1f27]"
+                className="group rounded-xl border border-[#282e39] bg-[#1c1f27]/80 p-4 backdrop-blur transition-all duration-300 hover:border-[#d41111]/30 hover:bg-[#1c1f27]"
               >
-                <stat.icon className="mb-2 h-5 w-5 text-[#1152d4] transition-transform duration-300 group-hover:scale-110" />
+                <stat.icon className="mb-2 h-5 w-5 text-[#d41111] transition-transform duration-300 group-hover:scale-110" />
                 <p className="text-xl font-black text-white">{stat.value}</p>
                 <p className="text-[11px] font-medium text-slate-500">
                   {stat.label}
@@ -189,17 +189,17 @@ export default function LoginPage() {
         <div className="w-full max-w-[420px] flex-shrink-0">
           <div className="relative">
             {/* Card glow */}
-            <div className="absolute -inset-1 rounded-2xl bg-gradient-to-b from-[#1152d4]/20 via-transparent to-transparent opacity-60 blur-sm" />
+            <div className="absolute -inset-1 rounded-2xl bg-gradient-to-b from-[#d41111]/20 via-transparent to-transparent opacity-60 blur-sm" />
 
             <div className="relative overflow-hidden rounded-2xl border border-[#282e39] bg-[#1c1f27]/90 shadow-2xl shadow-black/40 backdrop-blur-xl">
               {/* Top accent line */}
-              <div className="h-[2px] bg-gradient-to-r from-transparent via-[#1152d4] to-transparent" />
+              <div className="h-[2px] bg-gradient-to-r from-transparent via-[#d41111] to-transparent" />
 
               <div className="p-8">
                 {/* Header */}
                 <div className="mb-8 text-center">
-                  <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-[#1152d4]/10 ring-1 ring-[#1152d4]/20">
-                    <span className="material-symbols-outlined text-2xl text-[#1152d4]">
+                  <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-[#d41111]/10 ring-1 ring-[#d41111]/20">
+                    <span className="material-symbols-outlined text-2xl text-[#d41111]">
                       lock
                     </span>
                   </div>
@@ -225,7 +225,7 @@ export default function LoginPage() {
                       className={[
                         "flex items-center gap-3 rounded-xl border bg-[#101622]/60 px-4 py-3 transition-all duration-200",
                         focusedField === "email"
-                          ? "border-[#1152d4] ring-2 ring-[#1152d4]/20"
+                          ? "border-[#d41111] ring-2 ring-[#d41111]/20"
                           : "border-[#282e39] hover:border-slate-600",
                       ].join(" ")}
                     >
@@ -256,7 +256,7 @@ export default function LoginPage() {
                       className={[
                         "flex items-center gap-3 rounded-xl border bg-[#101622]/60 px-4 py-3 transition-all duration-200",
                         focusedField === "password"
-                          ? "border-[#1152d4] ring-2 ring-[#1152d4]/20"
+                          ? "border-[#d41111] ring-2 ring-[#d41111]/20"
                           : "border-[#282e39] hover:border-slate-600",
                       ].join(" ")}
                     >
@@ -292,13 +292,13 @@ export default function LoginPage() {
                     <label className="flex cursor-pointer items-center gap-2 text-slate-400">
                       <input
                         type="checkbox"
-                        className="h-3.5 w-3.5 rounded border-[#282e39] bg-[#101622] accent-[#1152d4]"
+                        className="h-3.5 w-3.5 rounded border-[#282e39] bg-[#101622] accent-[#d41111]"
                       />
                       Recordarme
                     </label>
                     <button
                       type="button"
-                      className="font-semibold text-[#1152d4] transition-colors hover:text-[#5b8def]"
+                      className="font-semibold text-[#d41111] transition-colors hover:text-[#ef5b5b]"
                     >
                       ¿Olvidaste tu contraseña?
                     </button>
@@ -308,7 +308,7 @@ export default function LoginPage() {
                   <button
                     type="submit"
                     disabled={isLoading}
-                    className="group relative flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#1152d4] to-[#1565e8] py-3.5 text-sm font-bold text-white shadow-lg shadow-[#1152d4]/25 transition-all duration-200 hover:shadow-xl hover:shadow-[#1152d4]/30 hover:brightness-110 disabled:opacity-70"
+                    className="group relative flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#d41111] to-[#e81515] py-3.5 text-sm font-bold text-white shadow-lg shadow-[#d41111]/25 transition-all duration-200 hover:shadow-xl hover:shadow-[#d41111]/30 hover:brightness-110 disabled:opacity-70"
                   >
                     {isLoading ? (
                       <>
@@ -347,7 +347,7 @@ export default function LoginPage() {
                 {/* Footer */}
                 <p className="mt-6 text-center text-xs text-slate-600">
                   ¿No tienes cuenta?{" "}
-                  <span className="cursor-pointer font-semibold text-[#1152d4] hover:text-[#5b8def]">
+                  <span className="cursor-pointer font-semibold text-[#d41111] hover:text-[#ef5b5b]">
                     Contacta a tu administrador
                   </span>
                 </p>

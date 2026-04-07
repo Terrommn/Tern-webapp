@@ -3,7 +3,7 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
-  --steelflow-primary: #1152d4;
+  --steelflow-primary: #d41111;
   --steelflow-background-light: #f6f6f8;
   --steelflow-background-dark: #101622;
   --steelflow-surface-dark: #1c1f27;
@@ -57,9 +57,9 @@ body {
   pointer-events: none;
   background:
     radial-gradient(circle at var(--glow-x, 22%) var(--glow-y, 18%),
-      rgb(17 82 212 / 0.26),
-      rgb(17 82 212 / 0.12) 24%,
-      rgb(17 82 212 / 0.04) 44%,
+      rgb(212 17 17 / 0.26),
+      rgb(212 17 17 / 0.12) 24%,
+      rgb(212 17 17 / 0.04) 44%,
       transparent 68%);
   transition: opacity 220ms ease;
   z-index: 0;
@@ -75,7 +75,7 @@ body {
   box-shadow:
     inset 0 0 0 1px rgb(148 163 184 / 0.08),
     inset 0 1px 0 rgb(255 255 255 / 0.08),
-    inset 0 0 26px rgb(17 82 212 / 0.14);
+    inset 0 0 26px rgb(212 17 17 / 0.14);
   transition: opacity 220ms ease;
   z-index: 0;
 }
