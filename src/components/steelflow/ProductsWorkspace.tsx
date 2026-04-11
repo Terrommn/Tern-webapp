@@ -211,6 +211,7 @@ export function ProductsWorkspace({
         pieces_per_package: null,
         shipping_packaging: null,
         max_pallet_width: null,
+        max_pallet_height: null,
         min_lot: null,
         created_at: now,
         updated_at: now,

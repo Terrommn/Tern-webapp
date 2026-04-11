@@ -3,23 +3,29 @@
 import { useEffect, useMemo, useState } from "react";
 import { CreateEntityModal } from "@/components/steelflow/CreateEntityModal";
 import { createClient as createSupabaseClient } from "@/lib/supabase/client";
+import {
+  calculatePalletLayout,
+  calculateMultiProductPalletLayout,
+} from "@/lib/pallet-calculator";
 import type { ClientRecord } from "@/types/client";
 import type { OrderRecord } from "@/types/order";
 import type { ProductRecord } from "@/types/product";
 
-type OrderFormState = {
-  client_id: string;
+type OrderLine = {
+  key: string;
   product_id: string;
   net_weight_ton: string;
+};
+
+type OrderFormState = {
+  client_id: string;
+  lines: OrderLine[];
   plant: string;
   status: string;
 };
 
 function formatDate(value: string | null) {
-  if (!value) {
-    return "N/A";
-  }
-
+  if (!value) return "N/A";
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
@@ -31,14 +37,26 @@ function orderKey(order: OrderRecord) {
   return `${order.id}-${order.line_number}`;
 }
 
+function firstProductForClient(products: ProductRecord[], client_id: string): string {
+  return products.find((p) => p.client_id === client_id)?.id ?? products[0]?.id ?? "";
+}
+
+function createDefaultLine(products: ProductRecord[], client_id: string): OrderLine {
+  return {
+    key: crypto.randomUUID(),
+    product_id: firstProductForClient(products, client_id),
+    net_weight_ton: "",
+  };
+}
+
 function createOrderFormState(
   clients: ClientRecord[],
   products: ProductRecord[]
 ): OrderFormState {
+  const client_id = clients[0]?.id ?? "";
   return {
-    client_id: clients[0]?.id ?? "",
-    product_id: products[0]?.id ?? "",
-    net_weight_ton: "",
+    client_id,
+    lines: [createDefaultLine(products, client_id)],
     plant: "",
     status: "PEN",
   };
@@ -64,25 +82,26 @@ export function OrdersWorkspace({
   );
 
   const clientMap = useMemo(
-    () => new Map(clients.map((client) => [client.id, client])),
+    () => new Map(clients.map((c) => [c.id, c])),
     [clients]
   );
   const productMap = useMemo(
-    () => new Map(products.map((product) => [product.id, product])),
+    () => new Map(products.map((p) => [p.id, p])),
     [products]
   );
 
+  // Products available for the currently selected client in the form
+  const clientProducts = useMemo(
+    () => products.filter((p) => p.client_id === form.client_id),
+    [products, form.client_id]
+  );
+
   const filteredOrders = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-
-    if (!normalizedQuery) {
-      return orders;
-    }
-
+    const q = query.trim().toLowerCase();
+    if (!q) return orders;
     return orders.filter((order) => {
       const client = clientMap.get(order.client_id);
       const product = productMap.get(order.product_id);
-
       return [
         String(order.id),
         client?.name ?? "",
@@ -90,24 +109,26 @@ export function OrdersWorkspace({
         order.plant ?? "",
         order.status ?? "",
         order.pallet_id ?? "",
-      ].some((value) => value.toLowerCase().includes(normalizedQuery));
+      ].some((v) => v.toLowerCase().includes(q));
     });
   }, [orders, query, clientMap, productMap]);
 
   useEffect(() => {
-    if (!filteredOrders.some((order) => orderKey(order) === selectedOrderKey)) {
+    if (!filteredOrders.some((o) => orderKey(o) === selectedOrderKey)) {
       setSelectedOrderKey(filteredOrders[0] ? orderKey(filteredOrders[0]) : "");
     }
   }, [filteredOrders, selectedOrderKey]);
 
   const selectedOrder =
-    filteredOrders.find((order) => orderKey(order) === selectedOrderKey) ??
+    filteredOrders.find((o) => orderKey(o) === selectedOrderKey) ??
     filteredOrders[0] ??
     orders[0];
 
-  const totalWeight = orders.reduce((sum, order) => sum + (Number(order.net_weight_ton) || 0), 0);
-  const uniqueClients = new Set(orders.map((order) => order.client_id)).size;
-  const uniqueProducts = new Set(orders.map((order) => order.product_id)).size;
+  const totalWeight = orders.reduce((s, o) => s + (Number(o.net_weight_ton) || 0), 0);
+  const uniqueClients = new Set(orders.map((o) => o.client_id)).size;
+  const uniqueProducts = new Set(orders.map((o) => o.product_id)).size;
+
+  // ── Form helpers ──────────────────────────────────────────────────────────
 
   function handleOpenCreate() {
     setForm(createOrderFormState(clients, products));
@@ -119,78 +140,113 @@ export function OrdersWorkspace({
     setForm(createOrderFormState(clients, products));
   }
 
-  function handleChange<K extends keyof OrderFormState>(
-    key: K,
-    value: OrderFormState[K]
-  ) {
-    setForm((current) => ({
-      ...current,
-      [key]: value,
+  function handleClientChange(client_id: string) {
+    setForm((f) => ({
+      ...f,
+      client_id,
+      lines: [createDefaultLine(products, client_id)],
     }));
   }
 
-  async function handleCreateOrder(event: React.FormEvent) {
+  function handleLineChange(index: number, field: keyof Omit<OrderLine, "key">, value: string) {
+    setForm((f) => {
+      const lines = [...f.lines];
+      lines[index] = { ...lines[index], [field]: value };
+      return { ...f, lines };
+    });
+  }
+
+  function handleAddLine() {
+    setForm((f) => ({
+      ...f,
+      lines: [...f.lines, createDefaultLine(products, f.client_id)],
+    }));
+  }
+
+  function handleRemoveLine(index: number) {
+    setForm((f) => ({
+      ...f,
+      lines: f.lines.filter((_, i) => i !== index),
+    }));
+  }
+
+  // ── Live pallet preview ───────────────────────────────────────────────────
+
+  const formPalletPreview = useMemo(() => {
+    const validLines = form.lines
+      .map((line, i) => {
+        const product = productMap.get(line.product_id);
+        const weight = Number(line.net_weight_ton);
+        if (!product || !weight || weight <= 0) return null;
+        return { product, net_weight_ton: weight, line_index: i };
+      })
+      .filter((l) => l !== null);
+
+    if (validLines.length === 0) return null;
+    return calculateMultiProductPalletLayout(validLines);
+  }, [form.lines, productMap]);
+
+  // ── Submit ────────────────────────────────────────────────────────────────
+
+  async function handleCreateOrder(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    const payload = {
-      client_id: form.client_id,
-      product_id: form.product_id,
-      net_weight_ton: Number(form.net_weight_ton),
-      plant: form.plant,
-      status: form.status,
-    };
+    const orderId = Date.now();
+    const now = new Date().toISOString();
+
+    const rows = form.lines.map((line, i) => {
+      const product = productMap.get(line.product_id);
+      const weight = Number(line.net_weight_ton);
+      const layout =
+        product && weight > 0 ? calculatePalletLayout(product, weight) : null;
+      return {
+        id: orderId,
+        line_number: i + 1,
+        client_id: form.client_id,
+        product_id: line.product_id,
+        net_weight_ton: weight,
+        plant: form.plant,
+        status: form.status,
+        created_at: now,
+        width_mm: layout?.pallet_dimensions.width_mm ?? null,
+        length_mm: layout?.pallet_dimensions.length_mm ?? null,
+        thickness_mm: product?.thickness ?? null,
+      };
+    });
 
     const supabase = createSupabaseClient();
-    const { data, error } = await supabase
-      .from("orders")
-      .insert(payload)
-      .select()
-      .single();
+    const { data, error } = await supabase.from("orders").insert(rows).select();
 
-    let newOrder: OrderRecord;
+    let newOrders: OrderRecord[];
     if (error) {
-      console.error("Failed to create order:", error);
-      const now = new Date().toISOString();
-      newOrder = {
-        id: Date.now(),
-        line_number: 1001,
-        status: form.status,
-        client_id: form.client_id,
+      console.error("Failed to create order:", error.message, error.details, error.hint, error.code);
+      newOrders = rows.map((row) => ({
+        ...row,
         consignee: "",
         purchase_order: 0,
-        plant: form.plant,
-        product_id: form.product_id,
-        net_weight_ton: Number(form.net_weight_ton),
-        gross_weight_ton: Number(form.net_weight_ton),
-        width_mm: 0,
-        length_mm: 0,
-        thickness_mm: 0,
+        gross_weight_ton: row.net_weight_ton,
         ofa_id: 0,
         pallet_id: "",
         pallet_date: null,
         dispatched_at: null,
-        created_at: now,
         updated_at: now,
-      };
+      } as OrderRecord));
     } else {
-      newOrder = data as OrderRecord;
+      newOrders = data as OrderRecord[];
     }
 
-    setOrders((current) => [newOrder, ...current]);
-    setSelectedOrderKey(orderKey(newOrder));
+    setOrders((current) => [...newOrders, ...current]);
+    setSelectedOrderKey(orderKey(newOrders[0]));
     setQuery("");
     handleCloseCreate();
   }
 
-  const selectedClient = selectedOrder
-    ? clientMap.get(selectedOrder.client_id)
-    : undefined;
-  const selectedProduct = selectedOrder
-    ? productMap.get(selectedOrder.product_id)
-    : undefined;
+  const selectedClient = selectedOrder ? clientMap.get(selectedOrder.client_id) : undefined;
+  const selectedProduct = selectedOrder ? productMap.get(selectedOrder.product_id) : undefined;
 
   return (
     <main className="mx-auto flex w-full max-w-[1600px] flex-1 flex-col gap-8 p-6 lg:p-10">
+      {/* ── Header ── */}
       <section className="steelflow-card-hover steelflow-card-hover--tl rounded-[32px] border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-8 shadow-sm dark:border-slate-800 dark:from-slate-950 dark:to-slate-900">
         <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
           <div className="space-y-3">
@@ -201,11 +257,11 @@ export function OrdersWorkspace({
               Order management linked to your Supabase data
             </h1>
             <p className="max-w-3xl text-sm leading-6 text-slate-500 dark:text-slate-400">
-              Each order links to a client and product, showing net weight,
-              status, plant, and pallet information from the live database.
+              Each order links to a client and one or more products, showing net
+              weight, status, plant, and pallet information from the live
+              database.
             </p>
           </div>
-
           <div className="flex flex-wrap gap-3">
             <button
               className="rounded-2xl bg-primary px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary/90"
@@ -218,54 +274,38 @@ export function OrdersWorkspace({
         </div>
       </section>
 
+      {/* ── Stats ── */}
       <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         <div className="steelflow-card-hover steelflow-card-hover--tl rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-950">
-          <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">
-            Total orders
-          </p>
-          <p className="mt-3 text-4xl font-black text-slate-900 dark:text-white">
-            {orders.length}
-          </p>
+          <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">Total orders</p>
+          <p className="mt-3 text-4xl font-black text-slate-900 dark:text-white">{orders.length}</p>
         </div>
         <div className="steelflow-card-hover steelflow-card-hover--tr rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-950">
-          <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">
-            Total weight
-          </p>
-          <p className="mt-3 text-4xl font-black text-slate-900 dark:text-white">
-            {totalWeight.toFixed(1)}T
-          </p>
+          <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">Total weight</p>
+          <p className="mt-3 text-4xl font-black text-slate-900 dark:text-white">{totalWeight.toFixed(1)}T</p>
         </div>
         <div className="steelflow-card-hover steelflow-card-hover--bl rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-950">
-          <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">
-            Unique clients
-          </p>
-          <p className="mt-3 text-4xl font-black text-slate-900 dark:text-white">
-            {uniqueClients}
-          </p>
+          <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">Unique clients</p>
+          <p className="mt-3 text-4xl font-black text-slate-900 dark:text-white">{uniqueClients}</p>
         </div>
         <div className="steelflow-card-hover steelflow-card-hover--br rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-950">
-          <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">
-            Unique products
-          </p>
-          <p className="mt-3 text-4xl font-black text-slate-900 dark:text-white">
-            {uniqueProducts}
-          </p>
+          <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">Unique products</p>
+          <p className="mt-3 text-4xl font-black text-slate-900 dark:text-white">{uniqueProducts}</p>
         </div>
       </section>
 
+      {/* ── List + Detail ── */}
       <section className="grid grid-cols-1 gap-8 xl:grid-cols-[minmax(0,1.5fr)_420px]">
+        {/* Order list */}
         <div className="flex min-w-0 flex-col gap-6">
           <div className="steelflow-card-hover steelflow-card-hover--tr rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="space-y-1">
-                <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-                  Search orders
-                </h2>
+                <h2 className="text-lg font-bold text-slate-900 dark:text-white">Search orders</h2>
                 <p className="text-sm text-slate-500 dark:text-slate-400">
                   Search by order ID, client, product, plant, status, or pallet.
                 </p>
               </div>
-
               <div className="relative min-w-0 lg:w-96">
                 <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
                   search
@@ -275,7 +315,7 @@ export function OrdersWorkspace({
                   placeholder="Search orders..."
                   type="text"
                   value={query}
-                  onChange={(event) => setQuery(event.target.value)}
+                  onChange={(e) => setQuery(e.target.value)}
                 />
               </div>
             </div>
@@ -285,12 +325,7 @@ export function OrdersWorkspace({
             {filteredOrders.map((order, index) => {
               const client = clientMap.get(order.client_id);
               const product = productMap.get(order.product_id);
-              const tiltClass = [
-                "steelflow-card-hover--tl",
-                "steelflow-card-hover--tr",
-                "steelflow-card-hover--bl",
-                "steelflow-card-hover--br",
-              ][index % 4];
+              const tiltClass = ["steelflow-card-hover--tl", "steelflow-card-hover--tr", "steelflow-card-hover--bl", "steelflow-card-hover--br"][index % 4];
               const key = orderKey(order);
               const isSelected = selectedOrder ? orderKey(selectedOrder) === key : false;
 
@@ -320,7 +355,6 @@ export function OrdersWorkspace({
                           {product?.id ?? "Unknown product"} · G{product?.gauge ?? "N/A"} · {product?.thickness ?? "N/A"}mm
                         </p>
                       </div>
-
                       <span
                         className={`rounded-full px-3 py-1 text-[11px] font-semibold ${
                           order.status === "CUM"
@@ -333,39 +367,24 @@ export function OrdersWorkspace({
                         {order.status}
                       </span>
                     </div>
-
                     <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
                       <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900">
-                        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
-                          Net weight
-                        </p>
+                        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Net weight</p>
                         <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">
                           {(Number(order.net_weight_ton) || 0).toFixed(2)}T
                         </p>
                       </div>
                       <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900">
-                        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
-                          Plant
-                        </p>
-                        <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">
-                          {order.plant ?? "N/A"}
-                        </p>
+                        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Plant</p>
+                        <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">{order.plant ?? "N/A"}</p>
                       </div>
                       <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900">
-                        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
-                          Created
-                        </p>
-                        <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">
-                          {formatDate(order.created_at)}
-                        </p>
+                        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Created</p>
+                        <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">{formatDate(order.created_at)}</p>
                       </div>
                       <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900">
-                        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
-                          Pallet
-                        </p>
-                        <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">
-                          {order.pallet_id || "N/A"}
-                        </p>
+                        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Pallet</p>
+                        <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">{order.pallet_id || "N/A"}</p>
                       </div>
                     </div>
                   </div>
@@ -376,23 +395,18 @@ export function OrdersWorkspace({
 
           {filteredOrders.length === 0 && (
             <div className="steelflow-card-hover steelflow-card-hover--bl rounded-[28px] border border-dashed border-slate-300 bg-white p-10 text-center dark:border-slate-700 dark:bg-slate-950">
-              <p className="text-lg font-bold text-slate-900 dark:text-white">
-                No orders found
-              </p>
-              <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                Try another search term.
-              </p>
+              <p className="text-lg font-bold text-slate-900 dark:text-white">No orders found</p>
+              <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Try another search term.</p>
             </div>
           )}
         </div>
 
+        {/* Detail panel */}
         <aside className="min-w-0">
           {selectedOrder && (
             <div className="steelflow-card-hover steelflow-card-hover--br sticky top-6 flex flex-col gap-5 rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-950">
               <div className="space-y-2">
-                <p className="text-xs font-bold uppercase tracking-[0.24em] text-slate-400">
-                  Selected order
-                </p>
+                <p className="text-xs font-bold uppercase tracking-[0.24em] text-slate-400">Selected order</p>
                 <h2 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">
                   #{selectedOrder.id} · L{selectedOrder.line_number}
                 </h2>
@@ -403,17 +417,13 @@ export function OrdersWorkspace({
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900">
-                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
-                    Net weight
-                  </p>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Net weight</p>
                   <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">
                     {(Number(selectedOrder.net_weight_ton) || 0).toFixed(2)}T
                   </p>
                 </div>
                 <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900">
-                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
-                    Gross weight
-                  </p>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Gross weight</p>
                   <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">
                     {(Number(selectedOrder.gross_weight_ton) || 0).toFixed(2)}T
                   </p>
@@ -421,9 +431,7 @@ export function OrdersWorkspace({
               </div>
 
               <div className="steelflow-card-hover steelflow-card-hover--tl rounded-[28px] border border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-900">
-                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
-                  Order details
-                </p>
+                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Order details</p>
                 <div className="mt-3 space-y-2 text-sm text-slate-600 dark:text-slate-300">
                   <p>Status: {selectedOrder.status}</p>
                   <p>Purchase order: {selectedOrder.purchase_order}</p>
@@ -456,13 +464,43 @@ export function OrdersWorkspace({
                   <p>Thickness: {selectedOrder.thickness_mm}mm</p>
                 </div>
               </div>
+
+              {selectedProduct && (
+                (() => {
+                  const layout = calculatePalletLayout(selectedProduct, selectedOrder.net_weight_ton);
+                  return (
+                    <div className="steelflow-card-hover steelflow-card-hover--br rounded-[28px] border border-slate-200 p-5 dark:border-slate-800">
+                      <h3 className="text-sm font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                        Pallet layout
+                      </h3>
+                      <div className="mt-3 space-y-1 text-sm text-slate-600 dark:text-slate-300">
+                        <p>Form: <span className="font-semibold">{layout.product_form}</span></p>
+                        <p>Orientation: <span className="font-semibold">{layout.orientation}</span></p>
+                        <p>Pieces: <span className="font-semibold">{layout.num_pieces}</span></p>
+                        <p>Pallets: <span className="font-semibold">{layout.num_pallets}</span></p>
+                        <p>Per pallet: <span className="font-semibold">{layout.pieces_per_pallet}</span></p>
+                        <p>
+                          Pallet size:{" "}
+                          <span className="font-semibold">
+                            {layout.pallet_dimensions.width_mm} × {layout.pallet_dimensions.length_mm} × {layout.pallet_dimensions.height_mm} mm
+                          </span>
+                        </p>
+                        {layout.packaging_code && (
+                          <p>Packaging: <span className="font-semibold">{layout.packaging_code}</span></p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()
+              )}
             </div>
           )}
         </aside>
       </section>
 
+      {/* ── Create modal ── */}
       <CreateEntityModal
-        description="Create an order row linked to a client and product."
+        description="Create an order with one or more product lines."
         formId="create-order-form"
         open={isCreateOpen}
         submitLabel="Create order"
@@ -474,66 +512,122 @@ export function OrdersWorkspace({
           id="create-order-form"
           onSubmit={handleCreateOrder}
         >
+          {/* Client */}
           <label className="flex flex-col gap-2 text-sm">
-            <span className="font-semibold text-slate-700 dark:text-slate-300">
-              Client
-            </span>
+            <span className="font-semibold text-slate-700 dark:text-slate-300">Client</span>
             <select
               className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
               value={form.client_id}
-              onChange={(event) => handleChange("client_id", event.target.value)}
+              onChange={(e) => handleClientChange(e.target.value)}
             >
               {clients.map((client) => (
-                <option key={client.id} value={client.id}>
-                  {client.name}
-                </option>
+                <option key={client.id} value={client.id}>{client.name}</option>
               ))}
             </select>
           </label>
 
+          {/* Plant */}
           <label className="flex flex-col gap-2 text-sm">
-            <span className="font-semibold text-slate-700 dark:text-slate-300">
-              Product
-            </span>
-            <select
-              className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
-              value={form.product_id}
-              onChange={(event) => handleChange("product_id", event.target.value)}
-            >
-              {products.map((product) => (
-                <option key={product.id} value={product.id}>
-                  {product.id} · G{product.gauge} · {product.thickness}mm
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="flex flex-col gap-2 text-sm">
-            <span className="font-semibold text-slate-700 dark:text-slate-300">
-              Net weight (tons)
-            </span>
-            <input
-              className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
-              min="0"
-              required
-              step="0.001"
-              type="number"
-              value={form.net_weight_ton}
-              onChange={(event) => handleChange("net_weight_ton", event.target.value)}
-            />
-          </label>
-
-          <label className="flex flex-col gap-2 text-sm">
-            <span className="font-semibold text-slate-700 dark:text-slate-300">
-              Plant
-            </span>
+            <span className="font-semibold text-slate-700 dark:text-slate-300">Plant</span>
             <input
               className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
               placeholder="e.g. Churubusco"
               value={form.plant}
-              onChange={(event) => handleChange("plant", event.target.value)}
+              onChange={(e) => setForm((f) => ({ ...f, plant: e.target.value }))}
             />
           </label>
+
+          {/* Product lines */}
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                Products
+              </span>
+              <button
+                className="rounded-xl bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary/20"
+                type="button"
+                onClick={handleAddLine}
+              >
+                + Add product
+              </button>
+            </div>
+
+            {form.lines.map((line, i) => (
+              <div
+                key={line.key}
+                className="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                    Line {i + 1}
+                  </span>
+                  {form.lines.length > 1 && (
+                    <button
+                      className="text-xs font-semibold text-red-400 hover:text-red-600"
+                      type="button"
+                      onClick={() => handleRemoveLine(i)}
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+                <select
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                  value={line.product_id}
+                  onChange={(e) => handleLineChange(i, "product_id", e.target.value)}
+                >
+                  {(clientProducts.length > 0 ? clientProducts : products).map((product) => (
+                    <option key={product.id} value={product.id}>
+                      {product.id} · G{product.gauge} · {product.thickness}mm
+                    </option>
+                  ))}
+                </select>
+                <input
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                  min="0"
+                  placeholder="Net weight (tons)"
+                  required
+                  step="0.001"
+                  type="number"
+                  value={line.net_weight_ton}
+                  onChange={(e) => handleLineChange(i, "net_weight_ton", e.target.value)}
+                />
+              </div>
+            ))}
+          </div>
+
+          {/* Pallet preview */}
+          {formPalletPreview && (
+            <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4">
+              <p className="text-xs font-bold uppercase tracking-wider text-primary">
+                Pallet preview
+              </p>
+              <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-sm text-slate-700 dark:text-slate-300">
+                <span className="text-slate-500">Pallets</span>
+                <span className="font-semibold">{formPalletPreview.num_pallets}</span>
+                <span className="text-slate-500">Total weight</span>
+                <span className="font-semibold">{formPalletPreview.total_weight_ton.toFixed(3)} T</span>
+              </div>
+              {formPalletPreview.pallets.map((pallet) => (
+                <div
+                  key={pallet.pallet_number}
+                  className="mt-3 rounded-xl border border-primary/10 bg-white p-3 dark:bg-slate-900"
+                >
+                  <p className="text-xs font-bold text-slate-500">
+                    Pallet {pallet.pallet_number} · {pallet.orientation} ·{" "}
+                    {pallet.dimensions.width_mm} × {pallet.dimensions.length_mm} × {pallet.dimensions.height_mm} mm
+                  </p>
+                  <ul className="mt-1 space-y-0.5">
+                    {pallet.lines.map((alloc) => (
+                      <li key={`${alloc.line_index}-${alloc.product_id}`} className="text-xs text-slate-600 dark:text-slate-400">
+                        Line {alloc.line_index + 1} — {alloc.product_id} · {alloc.num_pieces} pc · {alloc.weight_ton} T
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          )}
         </form>
       </CreateEntityModal>
     </main>

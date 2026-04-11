@@ -23,6 +23,7 @@ export type ProductRecord = {
   pieces_per_package: number | null;
   shipping_packaging: string | null;
   max_pallet_width: number | null;
+  max_pallet_height: number | null;
   created_at: string | null;
   updated_at: string | null;
 };
