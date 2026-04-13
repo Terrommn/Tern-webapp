@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Mail,
@@ -13,6 +13,15 @@ import {
   BarChart3,
   Boxes,
 } from "lucide-react";
+
+const FLOATING_PARTICLES = Array.from({ length: 30 }, (_, i) => ({
+  id: i,
+  x: (i * 37) % 100,
+  y: (i * 53 + 17) % 100,
+  size: (i % 3) + 1,
+  duration: 15 + (i % 8) * 2,
+  delay: i % 10,
+}));
 
 /* ─── Animated grid background ─── */
 function GridBackground() {
@@ -36,26 +45,9 @@ function GridBackground() {
 
 /* ─── Floating particles ─── */
 function FloatingParticles() {
-  const [particles, setParticles] = useState<
-    { id: number; x: number; y: number; size: number; duration: number; delay: number }[]
-  >([]);
-
-  useEffect(() => {
-    setParticles(
-      Array.from({ length: 30 }, (_, i) => ({
-        id: i,
-        x: Math.random() * 100,
-        y: Math.random() * 100,
-        size: Math.random() * 3 + 1,
-        duration: Math.random() * 20 + 15,
-        delay: Math.random() * 10,
-      }))
-    );
-  }, []);
-
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden">
-      {particles.map((p) => (
+      {FLOATING_PARTICLES.map((p) => (
         <div
           key={p.id}
           className="absolute rounded-full bg-[#d41111]/20 animate-pulse"

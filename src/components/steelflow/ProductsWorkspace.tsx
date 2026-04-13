@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { CreateEntityModal } from "@/components/steelflow/CreateEntityModal";
 import { createClient as createSupabaseClient } from "@/lib/supabase/client";
 import type { ClientRecord } from "@/types/client";
@@ -80,10 +80,6 @@ export function ProductsWorkspace({
     createFormState(clients)
   );
 
-  const clientMap = useMemo(
-    () => new Map(clients.map((c) => [c.id, c])),
-    [clients]
-  );
   const orderCountByProduct = useMemo(
     () =>
       orders.reduce<Record<string, number>>((acc, order) => {
@@ -115,18 +111,6 @@ export function ProductsWorkspace({
 
   const selectedProduct =
     products.find((product) => product.id === selectedProductId) ?? products[0];
-
-  useEffect(() => {
-    if (selectedProduct) {
-      setForm(createFormState(clients, selectedProduct));
-    }
-  }, [selectedProduct, clients]);
-
-  useEffect(() => {
-    if (!filteredProducts.some((product) => product.id === selectedProductId)) {
-      setSelectedProductId(filteredProducts[0]?.id ?? "");
-    }
-  }, [filteredProducts, selectedProductId]);
 
   function handleChange<K extends keyof ProductFormState>(
     key: K,
@@ -222,6 +206,7 @@ export function ProductsWorkspace({
 
     setProducts((current) => [newProduct, ...current]);
     setSelectedProductId(newProduct.id);
+    setForm(createFormState(clients, newProduct));
     setQuery("");
     handleCloseCreate();
   }

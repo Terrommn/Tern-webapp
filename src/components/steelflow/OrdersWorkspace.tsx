@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { CreateEntityModal } from "@/components/steelflow/CreateEntityModal";
 import { createClient as createSupabaseClient } from "@/lib/supabase/client";
 import {
@@ -112,12 +112,6 @@ export function OrdersWorkspace({
       ].some((v) => v.toLowerCase().includes(q));
     });
   }, [orders, query, clientMap, productMap]);
-
-  useEffect(() => {
-    if (!filteredOrders.some((o) => orderKey(o) === selectedOrderKey)) {
-      setSelectedOrderKey(filteredOrders[0] ? orderKey(filteredOrders[0]) : "");
-    }
-  }, [filteredOrders, selectedOrderKey]);
 
   const selectedOrder =
     filteredOrders.find((o) => orderKey(o) === selectedOrderKey) ??

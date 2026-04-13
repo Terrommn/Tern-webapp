@@ -20,12 +20,6 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es" className="dark">
-      <head>
-        <link
-          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,100..700,0..1,-50..200&display=swap"
-          rel="stylesheet"
-        />
-      </head>
       <body className={`${inter.variable} font-display antialiased min-h-screen bg-background-light text-slate-900 dark:bg-background-dark dark:text-slate-100`}>
         {children}
       </body>

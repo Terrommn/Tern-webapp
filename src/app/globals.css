@@ -1,3 +1,4 @@
+@import url("https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,100..700,0..1,-50..200&display=swap");
 @import "tailwindcss";
 
 :root {
@@ -18,9 +19,9 @@
   --color-background-dark: var(--steelflow-background-dark);
   --color-surface-dark: var(--steelflow-surface-dark);
   --color-border-dark: var(--steelflow-border-dark);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-  --font-display: var(--font-steelflow-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --font-display: "Inter", ui-sans-serif, system-ui, sans-serif;
 }
 
 @media (prefers-color-scheme: dark) {

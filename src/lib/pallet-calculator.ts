@@ -104,7 +104,6 @@ function explodeToPieces(
   const thickness = product.thickness ?? 1;
 
   let packing_mode: "width" | "height";
-  let packing_dim_mm: number;
   let fw: number, fl: number, fh: number;
 
   if (isCoil) {
@@ -231,28 +230,41 @@ export function calculateMultiProductPalletLayout(
     return { num_pallets: 0, total_weight_ton: 0, pallets: [] };
   }
 
-  // Group key: coils group by orientation, sheets all together
+  const batched = assignPiecesToPallets(allPieces);
+  const pallets: MultiPalletDetail[] = batched.map((batch, i) =>
+    buildMultiPallet(i + 1, batch)
+  );
+
+  const total_weight_ton = lines.reduce((s, l) => s + l.net_weight_ton, 0);
+  return { num_pallets: pallets.length, total_weight_ton, pallets };
+}
+
+/**
+ * Groups pieces by (packing_mode × orientation) and packs them into pallets
+ * using the weight-based sharing rule:
+ *   total_weight_on_pallet ≤ min(max_weight_ton) of pieces on that pallet.
+ * Coils and sheets never share. Coils of different orientation never share.
+ */
+function assignPiecesToPallets(pieces: Piece[]): Piece[][] {
   const groups = new Map<string, Piece[]>();
-  for (const piece of allPieces) {
+  for (const piece of pieces) {
     const key = piece.packing_mode === "height" ? "sheet" : `coil:${piece.orientation}`;
     const g = groups.get(key) ?? [];
     g.push(piece);
     groups.set(key, g);
   }
 
-  const pallets: MultiPalletDetail[] = [];
-
+  const result: Piece[][] = [];
   for (const [, group] of groups) {
     let currentBatch: Piece[] = [];
     let usedWeight = 0;
-    // Effective capacity = min(max_weight_ton) across all pieces on current pallet.
     let batchCapacity = Infinity;
 
     for (const piece of group) {
       const effectiveCapacity = Math.min(batchCapacity, piece.max_weight_ton);
 
       if (currentBatch.length > 0 && usedWeight + piece.weight_ton > effectiveCapacity) {
-        pallets.push(buildMultiPallet(pallets.length + 1, currentBatch));
+        result.push(currentBatch);
         currentBatch = [];
         usedWeight = 0;
         batchCapacity = Infinity;
@@ -264,12 +276,11 @@ export function calculateMultiProductPalletLayout(
     }
 
     if (currentBatch.length > 0) {
-      pallets.push(buildMultiPallet(pallets.length + 1, currentBatch));
+      result.push(currentBatch);
     }
   }
 
-  const total_weight_ton = lines.reduce((s, l) => s + l.net_weight_ton, 0);
-  return { num_pallets: pallets.length, total_weight_ton, pallets };
+  return result;
 }
 
 function buildMultiPallet(palletNumber: number, pieces: Piece[]): MultiPalletDetail {
@@ -325,4 +336,198 @@ function buildMultiPallet(palletNumber: number, pieces: Piece[]): MultiPalletDet
     total_weight_ton: totalWeight,
     dimensions: { width_mm: Math.round(w), length_mm: Math.round(l), height_mm: Math.round(h) },
   };
+}
+
+// ─── Unity JSON payload ──────────────────────────────────────────────────────
+//
+// Stable contract consumed by the Unity WebGL simulator. Coordinate system:
+//   x = width, y = height, z = length
+//   origin  = geometric center of each pallet
+//   transforms in meters, original dimensions preserved in mm.
+
+export type UnityVec3 = { x: number; y: number; z: number };
+
+export type UnityPiece = {
+  id: string;
+  line_index: number;
+  product_id: string;
+  weight_ton: number;
+  dimensions_mm: { width: number; height: number; length: number };
+  dimensions_m: { width: number; height: number; length: number };
+  position_m: UnityVec3;
+  rotation_deg: UnityVec3;
+};
+
+export type UnityPallet = {
+  pallet_number: number;
+  orientation: string;
+  packing_mode: "width" | "height";
+  dimensions_mm: { width: number; height: number; length: number };
+  dimensions_m: { width: number; height: number; length: number };
+  total_weight_ton: number;
+  pieces: UnityPiece[];
+};
+
+export type UnityPalletPayload = {
+  version: "1.0.0";
+  units: {
+    dimensions: "mm";
+    transforms: "m";
+    coordinate_system: {
+      axes: "x:width, y:height, z:length";
+      origin: "pallet_center";
+    };
+  };
+  pallets: UnityPallet[];
+  pieces: UnityPiece[];
+  summary: {
+    total_weight_ton: number;
+    num_pallets: number;
+    num_pieces: number;
+  };
+};
+
+const UNITY_UNITS: UnityPalletPayload["units"] = {
+  dimensions: "mm",
+  transforms: "m",
+  coordinate_system: {
+    axes: "x:width, y:height, z:length",
+    origin: "pallet_center",
+  },
+};
+
+function emptyUnityPayload(): UnityPalletPayload {
+  return {
+    version: "1.0.0",
+    units: UNITY_UNITS,
+    pallets: [],
+    pieces: [],
+    summary: { total_weight_ton: 0, num_pallets: 0, num_pieces: 0 },
+  };
+}
+
+function buildUnityPallet(palletNumber: number, pieces: Piece[]): UnityPallet {
+  const packing_mode = pieces[0].packing_mode;
+  const orientation = pieces[0].orientation;
+
+  let palletW: number;
+  let palletL: number;
+  let palletH: number;
+  if (packing_mode === "width") {
+    palletW = pieces.reduce((s, p) => s + p.footprint_w_mm, 0);
+    palletL = Math.max(...pieces.map((p) => p.footprint_l_mm));
+    palletH = Math.max(...pieces.map((p) => p.height_mm));
+  } else {
+    palletW = Math.max(...pieces.map((p) => p.footprint_w_mm));
+    palletL = Math.max(...pieces.map((p) => p.footprint_l_mm));
+    palletH = pieces.reduce((s, p) => s + p.height_mm, 0);
+  }
+
+  const unityPieces: UnityPiece[] = [];
+  let cumW = 0;
+  let cumH = 0;
+  for (let i = 0; i < pieces.length; i++) {
+    const p = pieces[i];
+    const pw = p.footprint_w_mm;
+    const pl = p.footprint_l_mm;
+    const ph = p.height_mm;
+
+    let x_mm: number;
+    let y_mm: number;
+    if (packing_mode === "width") {
+      x_mm = -palletW / 2 + cumW + pw / 2;
+      y_mm = 0;
+      cumW += pw;
+    } else {
+      x_mm = 0;
+      y_mm = -palletH / 2 + cumH + ph / 2;
+      cumH += ph;
+    }
+
+    unityPieces.push({
+      id: `p${palletNumber}-piece-${i + 1}`,
+      line_index: p.line_index,
+      product_id: p.product.id,
+      weight_ton: Number(p.weight_ton.toFixed(4)),
+      dimensions_mm: { width: pw, height: ph, length: pl },
+      dimensions_m: { width: pw / 1000, height: ph / 1000, length: pl / 1000 },
+      position_m: { x: x_mm / 1000, y: y_mm / 1000, z: 0 },
+      rotation_deg: { x: 0, y: 0, z: 0 },
+    });
+  }
+
+  const totalWeight = Number(
+    unityPieces.reduce((s, p) => s + p.weight_ton, 0).toFixed(4)
+  );
+
+  return {
+    pallet_number: palletNumber,
+    orientation,
+    packing_mode,
+    dimensions_mm: {
+      width: Math.round(palletW),
+      height: Math.round(palletH),
+      length: Math.round(palletL),
+    },
+    dimensions_m: {
+      width: palletW / 1000,
+      height: palletH / 1000,
+      length: palletL / 1000,
+    },
+    total_weight_ton: totalWeight,
+    pieces: unityPieces,
+  };
+}
+
+function buildUnityPayload(batched: Piece[][]): UnityPalletPayload {
+  const pallets: UnityPallet[] = batched.map((batch, idx) =>
+    buildUnityPallet(idx + 1, batch)
+  );
+  const flatPieces = pallets.flatMap((p) => p.pieces);
+  const total_weight_ton = Number(
+    flatPieces.reduce((s, p) => s + p.weight_ton, 0).toFixed(4)
+  );
+  return {
+    version: "1.0.0",
+    units: UNITY_UNITS,
+    pallets,
+    pieces: flatPieces,
+    summary: {
+      total_weight_ton,
+      num_pallets: pallets.length,
+      num_pieces: flatPieces.length,
+    },
+  };
+}
+
+/**
+ * Adapter: single product line → Unity JSON payload with per-piece transforms.
+ */
+export function createUnityPalletPayloadFromLayout(
+  product: ProductRecord,
+  net_weight_ton: number
+): UnityPalletPayload {
+  if (!Number.isFinite(net_weight_ton) || net_weight_ton <= 0) {
+    return emptyUnityPayload();
+  }
+  const pieces = explodeToPieces(product, net_weight_ton, 0);
+  if (pieces.length === 0) return emptyUnityPayload();
+  return buildUnityPayload(assignPiecesToPallets(pieces));
+}
+
+/**
+ * Adapter: multi-product layout → Unity JSON payload with per-piece transforms.
+ */
+export function createUnityPalletPayloadFromMultiProductLayout(
+  lines: Array<{ product: ProductRecord; net_weight_ton: number; line_index: number }>
+): UnityPalletPayload {
+  const valid = lines.filter(
+    (l) => Number.isFinite(l.net_weight_ton) && l.net_weight_ton > 0
+  );
+  if (valid.length === 0) return emptyUnityPayload();
+  const allPieces = valid.flatMap(({ product, net_weight_ton, line_index }) =>
+    explodeToPieces(product, net_weight_ton, line_index)
+  );
+  if (allPieces.length === 0) return emptyUnityPayload();
+  return buildUnityPayload(assignPiecesToPallets(allPieces));
 }

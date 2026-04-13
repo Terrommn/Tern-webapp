@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
+import type { OrderRecord } from "@/types/order";
 
-function MovableCube() {
+function MovableCube({ size, color }: { size: [number, number, number], color: string }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const keysRef = useRef<Set<string>>(new Set());
   const isDragging = useRef(false);
@@ -43,7 +44,6 @@ function MovableCube() {
         dragPlane.current.set(new THREE.Vector3(0, 1, 0), -meshRef.current.position.y);
         raycaster.ray.intersectPlane(dragPlane.current, intersection);
         dragOffset.current.copy(meshRef.current.position).sub(intersection);
-        gl.domElement.style.cursor = "grabbing";
       }
     };
 
@@ -60,14 +60,12 @@ function MovableCube() {
 
     const onPointerUp = () => {
       isDragging.current = false;
-      gl.domElement.style.cursor = "grab";
     };
 
     const el = gl.domElement;
     el.addEventListener("pointerdown", onPointerDown);
     el.addEventListener("pointermove", onPointerMove);
     el.addEventListener("pointerup", onPointerUp);
-    el.style.cursor = "grab";
     return () => {
       el.removeEventListener("pointerdown", onPointerDown);
       el.removeEventListener("pointermove", onPointerMove);
@@ -91,9 +89,9 @@ function MovableCube() {
   });
 
   return (
-    <mesh ref={meshRef} position={[0, 0.9, 0]} castShadow>
-      <boxGeometry args={[1.8, 1.8, 1.8]} />
-      <meshStandardMaterial color="#ffffff" metalness={0.6} roughness={0.3} />
+    <mesh ref={meshRef} position={[0, size[1] / 2, 0]} castShadow>
+      <boxGeometry args={size} />
+      <meshStandardMaterial color={color} metalness={0.6} roughness={0.3} />
     </mesh>
   );
 }
@@ -177,8 +175,12 @@ function UnitySplash({ onComplete }: { onComplete: () => void }) {
   );
 }
 
-export function UnitySimulator() {
+export function UnitySimulator({ orders = [] }: { orders?: OrderRecord[] }) {
   const [loading, setLoading] = useState(true);
+  const [selectedOrderId, setSelectedOrderId] = useState<number | "">(
+    orders.length > 0 ? orders[0].id : ""
+  );
+  const [scaleMultiplier, setScaleMultiplier] = useState<number>(1);
   const canvasRef = useRef<HTMLDivElement>(null);
 
   const handleLoadComplete = useCallback(() => setLoading(false), []);
@@ -187,46 +189,103 @@ export function UnitySimulator() {
     canvasRef.current?.requestFullscreen?.();
   }, []);
 
-  return (
-    <div ref={canvasRef} className="relative w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-950 dark:border-slate-800">
-      {loading && <UnitySplash onComplete={handleLoadComplete} />}
+  const selectedOrder = useMemo(
+    () => orders.find((o) => o.id === (selectedOrderId ? Number(selectedOrderId) : -1)),
+    [orders, selectedOrderId]
+  );
 
-      <div className="h-[500px] w-full lg:h-[600px]">
-        <Canvas
-          shadows
-          camera={{ position: [5, 8, 8], fov: 50 }}
-          gl={{ antialias: true }}
-          tabIndex={0}
-        >
-          <color attach="background" args={["#101622"]} />
-          <ambientLight intensity={0.4} />
-          <directionalLight
-            position={[5, 10, 5]}
-            intensity={1}
-            castShadow
-            shadow-mapSize-width={1024}
-            shadow-mapSize-height={1024}
-          />
-          <MovableCube />
-          <Ground />
-          <GridFloor />
-          <OrbitControls enablePan={false} maxPolarAngle={Math.PI / 2.2} />
-        </Canvas>
+  const cubeSize: [number, number, number] = useMemo(() => {
+    if (!selectedOrder) return [1.8 * scaleMultiplier, 1.8 * scaleMultiplier, 1.8 * scaleMultiplier];
+
+    // Using metric conversion. Assume dimensions are mm.
+    const width = (selectedOrder.width_mm || 1000) / 1000;
+    const length = (selectedOrder.length_mm || 1000) / 1000;
+    const thickness = (selectedOrder.thickness_mm || 1000) / 1000;
+
+    return [width * scaleMultiplier, thickness * scaleMultiplier, length * scaleMultiplier];
+  }, [selectedOrder, scaleMultiplier]);
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div className="flex flex-col gap-2">
+          <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+            Order
+          </label>
+          <select
+            className="w-full min-w-[250px] rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white md:w-auto"
+            value={selectedOrderId}
+            onChange={(e) => setSelectedOrderId(e.target.value ? Number(e.target.value) : "")}
+          >
+            <option value="">Seleccione una orden... (Generica)</option>
+            {orders.map((order) => (
+              <option key={order.id} value={order.id}>
+                Orden #{order.id} · Linea {order.line_number}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+            Scale Multiplier ({scaleMultiplier.toFixed(1)}x)
+          </label>
+          <div className="flex items-center gap-4">
+            <span className="text-xs text-slate-500">0.5x</span>
+            <input
+              type="range"
+              min="0.5"
+              max="5"
+              step="0.1"
+              value={scaleMultiplier}
+              onChange={(e) => setScaleMultiplier(parseFloat(e.target.value))}
+              className="w-full md:w-[200px]"
+            />
+            <span className="text-xs text-slate-500">5x</span>
+          </div>
+        </div>
       </div>
 
-      <div className="flex items-center justify-between border-t border-slate-800 px-4 py-3">
-        <div className="flex items-center gap-2 text-xs text-slate-400">
-          <span className="material-symbols-outlined text-sm">gamepad</span>
-          <span>WASD / Flechas para mover | Click y arrastrar el cubo</span>
+      <div ref={canvasRef} className="relative w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-950 dark:border-slate-800">
+        {loading && <UnitySplash onComplete={handleLoadComplete} />}
+
+        <div className="h-[500px] w-full cursor-grab lg:h-[600px]">
+          <Canvas
+            shadows
+            camera={{ position: [5, 8, 8], fov: 50 }}
+            gl={{ antialias: true }}
+            tabIndex={0}
+          >
+            <color attach="background" args={["#101622"]} />
+            <ambientLight intensity={0.4} />
+            <directionalLight
+              position={[5, 10, 5]}
+              intensity={1}
+              castShadow
+              shadow-mapSize-width={1024}
+              shadow-mapSize-height={1024}
+            />
+            <MovableCube size={cubeSize} color="#ffffff" />
+            <Ground />
+            <GridFloor />
+            <OrbitControls enablePan={false} maxPolarAngle={Math.PI / 2.2} />
+          </Canvas>
         </div>
-        <button
-          type="button"
-          className="flex items-center gap-1.5 rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-300 transition-colors hover:bg-slate-700 hover:text-white"
-          onClick={handleFullscreen}
-        >
-          <span className="material-symbols-outlined text-sm">fullscreen</span>
-          Pantalla Completa
-        </button>
+
+        <div className="flex items-center justify-between border-t border-slate-800 px-4 py-3">
+          <div className="flex items-center gap-2 text-xs text-slate-400">
+            <span className="material-symbols-outlined text-sm">gamepad</span>
+            <span>WASD / Flechas para mover | Click y arrastrar el cubo</span>
+          </div>
+          <button
+            type="button"
+            className="flex items-center gap-1.5 rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-300 transition-colors hover:bg-slate-700 hover:text-white"
+            onClick={handleFullscreen}
+          >
+            <span className="material-symbols-outlined text-sm">fullscreen</span>
+            Pantalla Completa
+          </button>
+        </div>
       </div>
     </div>
   );

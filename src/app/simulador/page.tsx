@@ -1,12 +1,18 @@
 import { SteelFlowShell } from "@/components/steelflow/SteelFlowShell";
 import { UnitySimulator } from "@/components/steelflow/UnitySimulator";
+import { createClient } from "@/lib/supabase/server";
+import type { OrderRecord } from "@/types/order";
 
 export const metadata = {
   title: "Simulador 3D | SteelFlow Pro",
   description: "Simulador interactivo 3D de componentes industriales.",
 };
 
-export default function SimuladorPage() {
+export default async function SimuladorPage() {
+  const supabase = await createClient();
+  const { data } = await supabase.from("orders").select("*");
+  const orders = (data ?? []) as OrderRecord[];
+
   return (
     <SteelFlowShell>
       <main className="mx-auto w-full max-w-[1440px] flex-1 p-6 lg:p-10">
@@ -18,7 +24,7 @@ export default function SimuladorPage() {
             Visualizacion interactiva de componentes industriales.
           </p>
         </div>
-        <UnitySimulator />
+        <UnitySimulator orders={orders} />
       </main>
     </SteelFlowShell>
   );
