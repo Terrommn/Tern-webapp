@@ -1,3 +1,4 @@
+import { AppIcon } from "@/components/ui/app-icon";
 import { SteelFlowShell } from "@/components/steelflow/SteelFlowShell";
 import { createClient } from "@/lib/supabase/server";
 
@@ -150,7 +151,7 @@ export default async function SteelFlowProDashboardPage() {
                 className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900"
               >
                 <div className="flex items-center gap-2 text-slate-400">
-                  <span className="material-symbols-outlined text-base">{kpi.icon}</span>
+                  <AppIcon className="text-base" name={kpi.icon} />
                   <span className="text-[11px] font-bold uppercase tracking-wider">{kpi.label}</span>
                 </div>
                 <p className="mt-2 text-2xl font-black text-slate-900 dark:text-white">{kpi.value}</p>
@@ -172,9 +173,7 @@ export default async function SteelFlowProDashboardPage() {
                   </p>
                 </div>
                 <span className="flex items-center text-sm font-bold text-emerald-500">
-                  <span className="material-symbols-outlined text-sm">
-                    trending_up
-                  </span>{" "}
+                  <AppIcon className="text-sm" name="trending_up" />{" "}
                   {weightChangePercent}
                 </span>
               </div>
@@ -339,13 +338,11 @@ export default async function SteelFlowProDashboardPage() {
           {/* Pallet Calculator Card */}
           <div className="relative overflow-hidden rounded-xl bg-primary p-6 text-white shadow-lg">
             <div className="absolute -right-10 -bottom-10 opacity-10">
-              <span className="material-symbols-outlined text-[160px]">
-                calculate
-              </span>
+              <AppIcon className="text-[160px]" name="calculate" />
             </div>
             <div className="relative z-10">
               <div className="mb-4 flex items-center gap-2">
-                <span className="material-symbols-outlined">inventory_2</span>
+                <AppIcon className="text-xl" name="inventory_2" />
                 <h3 className="text-lg font-bold">
                   Calculadora de Empaquetado
                 </h3>
@@ -431,9 +428,10 @@ export default async function SteelFlowProDashboardPage() {
               {capacityItems.map((item, i) => (
                 <div className="flex items-center gap-4" key={item.name}>
                   <div className="flex size-12 items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-800">
-                    <span className="material-symbols-outlined text-slate-500">
-                      {capacityIcons[i] ?? "factory"}
-                    </span>
+                    <AppIcon
+                      className="text-xl text-slate-500"
+                      name={capacityIcons[i] ?? "factory"}
+                    />
                   </div>
                   <div className="flex-1">
                     <p className="text-sm font-bold text-slate-900 dark:text-white">
@@ -461,9 +459,7 @@ export default async function SteelFlowProDashboardPage() {
 
           {/* Industrial Support Info */}
           <div className="flex items-center gap-3 rounded-xl border border-dashed border-slate-300 p-4 dark:border-slate-700">
-            <span className="material-symbols-outlined text-slate-400">
-              help_center
-            </span>
+            <AppIcon className="text-xl text-slate-400" name="help_center" />
             <div>
               <p className="text-sm font-bold text-slate-900 dark:text-white">
                 Industrial Support

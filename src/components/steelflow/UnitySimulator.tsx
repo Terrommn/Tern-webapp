@@ -1,5 +1,6 @@
 "use client";
 
+import { AppIcon } from "@/components/ui/app-icon";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
@@ -155,9 +156,10 @@ function UnitySplash({ onComplete }: { onComplete: () => void }) {
         </div>
       ) : (
         <div className="flex flex-col items-center gap-4">
-          <span className="material-symbols-outlined animate-spin text-4xl text-[#d41111]">
-            progress_activity
-          </span>
+          <AppIcon
+            className="animate-spin text-4xl text-[#d41111]"
+            name="progress_activity"
+          />
           <div className="w-48">
             <div className="h-1.5 w-full rounded-full bg-slate-800">
               <div
@@ -274,7 +276,7 @@ export function UnitySimulator({ orders = [] }: { orders?: OrderRecord[] }) {
 
         <div className="flex items-center justify-between border-t border-slate-800 px-4 py-3">
           <div className="flex items-center gap-2 text-xs text-slate-400">
-            <span className="material-symbols-outlined text-sm">gamepad</span>
+            <AppIcon className="text-sm" name="gamepad" />
             <span>WASD / Flechas para mover | Click y arrastrar el cubo</span>
           </div>
           <button
@@ -282,7 +284,7 @@ export function UnitySimulator({ orders = [] }: { orders?: OrderRecord[] }) {
             className="flex items-center gap-1.5 rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-300 transition-colors hover:bg-slate-700 hover:text-white"
             onClick={handleFullscreen}
           >
-            <span className="material-symbols-outlined text-sm">fullscreen</span>
+            <AppIcon className="text-sm" name="fullscreen" />
             Pantalla Completa
           </button>
         </div>

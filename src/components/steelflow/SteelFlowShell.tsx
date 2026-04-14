@@ -1,5 +1,6 @@
 "use client";
 
+import { AppIcon } from "@/components/ui/app-icon";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
@@ -71,9 +72,7 @@ export function SteelFlowShell({ children }: { children: React.ReactNode }) {
             href="/"
             onClick={() => setMobileOpen(false)}
           >
-            <span className="material-symbols-outlined text-3xl">
-              precision_manufacturing
-            </span>
+            <AppIcon className="text-3xl" name="precision_manufacturing" />
             <div className={isCollapsed ? "hidden md:hidden" : "min-w-0"}>
               <p className="truncate text-lg font-black tracking-tight text-slate-900 dark:text-white">
                 SteelFlow
@@ -91,9 +90,10 @@ export function SteelFlowShell({ children }: { children: React.ReactNode }) {
               type="button"
               onClick={() => setIsCollapsed((value) => !value)}
             >
-              <span className="material-symbols-outlined">
-                {isCollapsed ? "chevron_right" : "chevron_left"}
-              </span>
+              <AppIcon
+                className="text-xl"
+                name={isCollapsed ? "chevron_right" : "chevron_left"}
+              />
             </button>
             <button
               aria-label="Cerrar menú"
@@ -101,7 +101,7 @@ export function SteelFlowShell({ children }: { children: React.ReactNode }) {
               type="button"
               onClick={() => setMobileOpen(false)}
             >
-              <span className="material-symbols-outlined">close</span>
+              <AppIcon className="text-xl" name="close" />
             </button>
           </div>
         </div>
@@ -136,9 +136,7 @@ export function SteelFlowShell({ children }: { children: React.ReactNode }) {
                   onClick={() => setMobileOpen(false)}
                   title={label}
                 >
-                  <span className="material-symbols-outlined text-[20px]">
-                    {icon}
-                  </span>
+                  <AppIcon className="text-[20px]" name={icon} />
                   <span className={isCollapsed ? "md:hidden" : ""}>{label}</span>
                 </Link>
               );
@@ -181,7 +179,7 @@ export function SteelFlowShell({ children }: { children: React.ReactNode }) {
             type="button"
             onClick={() => setMobileOpen(true)}
           >
-            <span className="material-symbols-outlined">menu</span>
+            <AppIcon className="text-xl" name="menu" />
           </button>
           <div className="min-w-0">
             <p className="text-xs font-bold uppercase tracking-[0.24em] text-slate-400">

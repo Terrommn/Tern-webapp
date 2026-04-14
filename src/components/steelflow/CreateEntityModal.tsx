@@ -1,5 +1,6 @@
 "use client";
 
+import { AppIcon } from "@/components/ui/app-icon";
 import type { ReactNode } from "react";
 
 type CreateEntityModalProps = {
@@ -55,7 +56,7 @@ export function CreateEntityModal({
             type="button"
             onClick={onClose}
           >
-            <span className="material-symbols-outlined">close</span>
+            <AppIcon className="text-xl" name="close" />
           </button>
         </div>
 

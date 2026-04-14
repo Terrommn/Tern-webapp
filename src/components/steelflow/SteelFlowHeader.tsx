@@ -1,5 +1,6 @@
 "use client";
 
+import { AppIcon } from "@/components/ui/app-icon";
 import { createClient } from "@/lib/supabase/client";
 import Image from "next/image";
 import Link from "next/link";
@@ -32,9 +33,7 @@ export function SteelFlowHeader({ searchPlaceholder = "Buscar..." }: { searchPla
       <div className="mx-auto flex max-w-[1440px] items-center justify-between">
         <div className="flex items-center gap-8">
           <Link className="flex items-center gap-3 text-primary" href="/">
-            <span className="material-symbols-outlined text-3xl">
-              precision_manufacturing
-            </span>
+            <AppIcon className="text-3xl" name="precision_manufacturing" />
             <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
               SteelFlow Pro
             </h2>
@@ -60,9 +59,10 @@ export function SteelFlowHeader({ searchPlaceholder = "Buscar..." }: { searchPla
         </div>
         <div className="flex items-center gap-4">
           <div className="relative hidden sm:block">
-            <span className="material-symbols-outlined absolute left-3 top-1/2 size-5 -translate-y-1/2 text-slate-400">
-              search
-            </span>
+            <AppIcon
+              className="absolute left-3 top-1/2 size-5 -translate-y-1/2 text-slate-400"
+              name="search"
+            />
             <input
               className="w-64 rounded-lg border-none bg-slate-100 py-2 pl-10 pr-4 text-sm focus:ring-2 focus:ring-primary dark:bg-slate-800"
               placeholder={searchPlaceholder}
@@ -73,14 +73,14 @@ export function SteelFlowHeader({ searchPlaceholder = "Buscar..." }: { searchPla
             className="relative rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
             type="button"
           >
-            <span className="material-symbols-outlined">notifications</span>
+            <AppIcon className="text-xl" name="notifications" />
             <span className="absolute right-2 top-2 size-2 rounded-full border-2 border-background-dark bg-red-500" />
           </button>
           <button
             className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
             type="button"
           >
-            <span className="material-symbols-outlined">settings</span>
+            <AppIcon className="text-xl" name="settings" />
           </button>
           <div className="relative" ref={userMenuRef}>
             <button
@@ -112,9 +112,7 @@ export function SteelFlowHeader({ searchPlaceholder = "Buscar..." }: { searchPla
                     type="button"
                     onClick={handleSignOut}
                   >
-                    <span className="material-symbols-outlined text-lg">
-                      logout
-                    </span>
+                    <AppIcon className="text-lg" name="logout" />
                     Cerrar sesión
                   </button>
                 </div>

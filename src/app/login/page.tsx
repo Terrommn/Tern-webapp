@@ -1,5 +1,6 @@
 "use client";
 
+import { AppIcon } from "@/components/ui/app-icon";
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -123,9 +124,7 @@ export default function LoginPage() {
             <div className="relative flex items-center justify-center">
               <div className="absolute inset-0 rounded-xl bg-[#d41111]/30 blur-xl" />
               <div className="relative flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-[#d41111] to-[#a60d0d] shadow-lg shadow-[#d41111]/25">
-                <span className="material-symbols-outlined text-3xl text-white">
-                  precision_manufacturing
-                </span>
+                <AppIcon className="text-3xl text-white" name="precision_manufacturing" />
               </div>
             </div>
             <div>
@@ -191,9 +190,7 @@ export default function LoginPage() {
                 {/* Header */}
                 <div className="mb-8 text-center">
                   <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-[#d41111]/10 ring-1 ring-[#d41111]/20">
-                    <span className="material-symbols-outlined text-2xl text-[#d41111]">
-                      lock
-                    </span>
+                    <AppIcon className="text-2xl text-[#d41111]" name="lock" />
                   </div>
                   <h3 className="text-xl font-bold text-white">
                     Bienvenido de vuelta
@@ -330,9 +327,7 @@ export default function LoginPage() {
                   type="button"
                   className="flex w-full items-center justify-center gap-3 rounded-xl border border-[#282e39] bg-[#101622]/40 py-3 text-sm font-semibold text-slate-300 transition-all duration-200 hover:border-slate-600 hover:bg-[#101622]/70"
                 >
-                  <span className="material-symbols-outlined text-lg">
-                    domain
-                  </span>
+                  <AppIcon className="text-lg" name="domain" />
                   Acceso con SSO Corporativo
                 </button>
 
