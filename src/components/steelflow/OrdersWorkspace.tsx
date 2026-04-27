@@ -2,6 +2,7 @@
 
 import { AppIcon } from "@/components/ui/app-icon";
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { CreateEntityModal } from "@/components/steelflow/CreateEntityModal";
 import { createClient as createSupabaseClient } from "@/lib/supabase/client";
 import {
@@ -326,17 +327,19 @@ export function OrdersWorkspace({
               const isSelected = selectedOrder ? orderKey(selectedOrder) === key : false;
 
               return (
-                <button
+                <div
                   key={key}
+                  role="button"
+                  tabIndex={0}
                   className={[
-                    "steelflow-card-hover w-full rounded-[28px] border bg-white p-6 text-left shadow-sm dark:bg-slate-950",
+                    "steelflow-card-hover w-full cursor-pointer rounded-[28px] border bg-white p-6 text-left shadow-sm dark:bg-slate-950",
                     tiltClass,
                     isSelected
                       ? "border-primary ring-2 ring-primary/20 dark:border-primary"
                       : "border-slate-200 dark:border-slate-800",
                   ].join(" ")}
-                  type="button"
                   onClick={() => setSelectedOrderKey(key)}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setSelectedOrderKey(key); }}
                 >
                   <div className="flex flex-col gap-5">
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -351,17 +354,28 @@ export function OrdersWorkspace({
                           {product?.id ?? "Unknown product"} · G{product?.gauge ?? "N/A"} · {product?.thickness ?? "N/A"}mm
                         </p>
                       </div>
-                      <span
-                        className={`rounded-full px-3 py-1 text-[11px] font-semibold ${
-                          order.status === "CUM"
-                            ? "bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400"
-                            : order.status === "PEN"
-                              ? "bg-primary/10 text-primary"
-                              : "bg-orange-500/10 text-orange-600 dark:bg-orange-500/15 dark:text-orange-400"
-                        }`}
-                      >
-                        {order.status}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <Link
+                          href={`/simulador?order=${order.id}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="flex items-center gap-1.5 rounded-xl bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/20"
+                          title="Ver en Simulador 3D"
+                        >
+                          <AppIcon className="text-sm" name="view_in_ar" />
+                          <span className="hidden sm:inline">3D</span>
+                        </Link>
+                        <span
+                          className={`rounded-full px-3 py-1 text-[11px] font-semibold ${
+                            order.status === "CUM"
+                              ? "bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400"
+                              : order.status === "PEN"
+                                ? "bg-primary/10 text-primary"
+                                : "bg-orange-500/10 text-orange-600 dark:bg-orange-500/15 dark:text-orange-400"
+                          }`}
+                        >
+                          {order.status}
+                        </span>
+                      </div>
                     </div>
                     <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
                       <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900">
@@ -384,7 +398,7 @@ export function OrdersWorkspace({
                       </div>
                     </div>
                   </div>
-                </button>
+                </div>
               );
             })}
           </div>
@@ -410,6 +424,14 @@ export function OrdersWorkspace({
                   {selectedClient?.name ?? selectedOrder.client_id} · {selectedOrder.plant}
                 </p>
               </div>
+
+              <Link
+                href={`/simulador?order=${selectedOrder.id}`}
+                className="flex items-center justify-center gap-2 rounded-2xl bg-primary px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary/90"
+              >
+                <AppIcon className="text-lg" name="view_in_ar" />
+                Ver en Simulador 3D
+              </Link>
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900">

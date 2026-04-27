@@ -2,16 +2,26 @@ import { SteelFlowShell } from "@/components/steelflow/SteelFlowShell";
 import { UnitySimulator } from "@/components/steelflow/UnitySimulator";
 import { createClient } from "@/lib/supabase/server";
 import type { OrderRecord } from "@/types/order";
+import type { ProductRecord } from "@/types/product";
 
 export const metadata = {
   title: "Simulador 3D | SteelFlow Pro",
-  description: "Simulador interactivo 3D de componentes industriales.",
+  description: "Simulador interactivo 3D de tarimas industriales.",
 };
 
-export default async function SimuladorPage() {
+export default async function SimuladorPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ order?: string }>;
+}) {
+  const params = await searchParams;
+  const initialOrderId = params.order ? Number(params.order) : undefined;
+
   const supabase = await createClient();
-  const { data } = await supabase.from("orders").select("*");
-  const orders = (data ?? []) as OrderRecord[];
+  const [{ data: ordersData }, { data: productsData }] = await Promise.all([
+    supabase.from("orders").select("*"),
+    supabase.from("products").select("*"),
+  ]);
 
   return (
     <SteelFlowShell>
@@ -21,10 +31,14 @@ export default async function SimuladorPage() {
             Simulador 3D
           </h1>
           <p className="text-slate-500 dark:text-slate-400">
-            Visualizacion interactiva de componentes industriales.
+            Visualizacion interactiva de tarimas industriales.
           </p>
         </div>
-        <UnitySimulator orders={orders} />
+        <UnitySimulator
+          orders={(ordersData ?? []) as OrderRecord[]}
+          products={(productsData ?? []) as ProductRecord[]}
+          initialOrderId={initialOrderId}
+        />
       </main>
     </SteelFlowShell>
   );
