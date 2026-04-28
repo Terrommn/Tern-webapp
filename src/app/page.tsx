@@ -2,19 +2,70 @@ import { AppIcon } from "@/components/ui/app-icon";
 import { AuthShell } from "@/components/steelflow/AuthShell";
 import { createClient } from "@/lib/supabase/server";
 
+const DEMO_USER_ID = "00000000-0000-0000-0000-000000000001";
+
+const LEVEL_THRESHOLDS = [
+  { level: 1, xp: 0 },
+  { level: 2, xp: 200 },
+  { level: 3, xp: 500 },
+  { level: 4, xp: 1000 },
+  { level: 5, xp: 2000 },
+  { level: 6, xp: 3500 },
+  { level: 7, xp: 5500 },
+  { level: 8, xp: 8000 },
+  { level: 9, xp: 12000 },
+  { level: 10, xp: 17000 },
+  { level: 11, xp: 24000 },
+  { level: 12, xp: 33000 },
+];
+
 export default async function SteelFlowProDashboardPage() {
   const supabase = await createClient();
 
   // Fetch all tables in parallel
-  const [ordersRes, clientsRes, productsRes] = await Promise.all([
-    supabase.from("orders").select("*").order("created_at", { ascending: false }),
-    supabase.from("clients").select("*"),
-    supabase.from("products").select("*"),
-  ]);
+  const [ordersRes, clientsRes, productsRes, profileRes, levelDefsRes] =
+    await Promise.all([
+      supabase
+        .from("orders")
+        .select("*")
+        .order("created_at", { ascending: false }),
+      supabase.from("clients").select("*"),
+      supabase.from("products").select("*"),
+      supabase
+        .from("user_profiles")
+        .select("*")
+        .eq("id", DEMO_USER_ID)
+        .maybeSingle(),
+      supabase
+        .from("level_definitions")
+        .select("*")
+        .order("level", { ascending: true }),
+    ]);
 
   const orders = ordersRes.data ?? [];
   const clients = clientsRes.data ?? [];
   const products = productsRes.data ?? [];
+  const profile = profileRes.data;
+  const levelDefs = levelDefsRes.data ?? [];
+
+  // ── Gamification (real data) ──
+  const totalXP = (profile?.total_xp ?? 0) as number;
+  const currentLevel = (profile?.current_level ?? 1) as number;
+  const currentStreak = (profile?.current_streak_days ?? 0) as number;
+  const currentLevelDef = levelDefs.find((l) => l.level === currentLevel);
+  const levelTitle = (currentLevelDef?.title_es ?? "Aprendiz") as string;
+
+  const currentLevelXP =
+    LEVEL_THRESHOLDS.find((t) => t.level === currentLevel)?.xp ?? 0;
+  const nextLevelXP =
+    LEVEL_THRESHOLDS.find((t) => t.level === currentLevel + 1)?.xp ??
+    LEVEL_THRESHOLDS[LEVEL_THRESHOLDS.length - 1].xp;
+  const xpInLevel = Math.max(totalXP - currentLevelXP, 0);
+  const xpNeeded = Math.max(nextLevelXP - currentLevelXP, 1);
+  const levelProgressPct = Math.min(
+    100,
+    Math.round((xpInLevel / xpNeeded) * 100),
+  );
 
   // Build lookup maps
   const clientMap = new Map(clients.map((c) => [c.id, c]));
@@ -351,17 +402,28 @@ export default async function SteelFlowProDashboardPage() {
               </div>
               <div className="flex-1">
                 <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Gamificacion</p>
-                <p className="text-sm font-bold text-slate-900 dark:text-white">Lv.3 Tecnico de Fundicion</p>
+                <p className="text-sm font-bold text-slate-900 dark:text-white">
+                  Lv.{currentLevel} {levelTitle}
+                </p>
               </div>
               <div className="text-right">
-                <p className="text-xs font-bold text-primary">620 XP</p>
-                <p className="text-[10px] text-slate-400">7 dias racha</p>
+                <p className="text-xs font-bold text-primary">
+                  {totalXP.toLocaleString()} XP
+                </p>
+                <p className="text-[10px] text-slate-400">
+                  {currentStreak} {currentStreak === 1 ? "dia" : "dias"} racha
+                </p>
               </div>
             </div>
             <div className="mt-3 h-1.5 w-full rounded-full bg-slate-100 dark:bg-slate-800">
-              <div className="h-full w-[62%] rounded-full bg-primary" />
+              <div
+                className="h-full rounded-full bg-primary"
+                style={{ width: `${levelProgressPct}%` }}
+              />
             </div>
-            <p className="mt-1 text-[10px] text-slate-400">620 / 1,000 XP para siguiente nivel</p>
+            <p className="mt-1 text-[10px] text-slate-400">
+              {totalXP.toLocaleString()} / {nextLevelXP.toLocaleString()} XP para siguiente nivel
+            </p>
           </a>
 
           {/* Weight by Plant Card */}
