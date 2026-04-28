@@ -3,7 +3,7 @@
 import { AppIcon } from "@/components/ui/app-icon";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { OrbitControls, Html } from "@react-three/drei";
+import { OrbitControls, Html, Line } from "@react-three/drei";
 import * as THREE from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import type { OrderRecord } from "@/types/order";
@@ -207,8 +207,8 @@ function CoilPiece({
     >
       <meshStandardMaterial
         color={color}
-        metalness={0.85}
-        roughness={0.15}
+        metalness={0.7}
+        roughness={0.3}
         side={THREE.DoubleSide}
         emissive={selected ? "#ffffff" : "#000000"}
         emissiveIntensity={selected ? 0.06 : 0}
@@ -239,12 +239,281 @@ function SheetPiece({
       <boxGeometry args={[width, h, length]} />
       <meshStandardMaterial
         color={color}
-        metalness={0.7}
-        roughness={0.25}
+        metalness={0.55}
+        roughness={0.35}
         emissive={selected ? "#ffffff" : "#000000"}
         emissiveIntensity={selected ? 0.04 : 0}
       />
     </mesh>
+  );
+}
+
+// ─── Dimension Line (with end ticks + Html label) ───────────────────────────
+
+const DIM_COLOR = "#ffffff";
+const DIM_OPACITY = 0.7;
+const TICK_HALF = 0.04;
+
+function DimensionLine({
+  start,
+  end,
+  label,
+  tickAxis = "x",
+}: {
+  start: [number, number, number];
+  end: [number, number, number];
+  label: string;
+  /** Axis along which the end-ticks extend (perpendicular to the line). */
+  tickAxis?: "x" | "y" | "z";
+}) {
+  const sv = new THREE.Vector3(...start);
+  const ev = new THREE.Vector3(...end);
+  const mid: [number, number, number] = [
+    (sv.x + ev.x) / 2,
+    (sv.y + ev.y) / 2,
+    (sv.z + ev.z) / 2,
+  ];
+
+  const tickOffset: [number, number, number] =
+    tickAxis === "x"
+      ? [TICK_HALF, 0, 0]
+      : tickAxis === "y"
+        ? [0, TICK_HALF, 0]
+        : [0, 0, TICK_HALF];
+  const off = (p: [number, number, number], sign: number): [number, number, number] => [
+    p[0] + tickOffset[0] * sign,
+    p[1] + tickOffset[1] * sign,
+    p[2] + tickOffset[2] * sign,
+  ];
+
+  return (
+    <group>
+      <Line
+        points={[start, end]}
+        color={DIM_COLOR}
+        transparent
+        opacity={DIM_OPACITY}
+        lineWidth={1.2}
+      />
+      <Line
+        points={[off(start, -1), off(start, 1)]}
+        color={DIM_COLOR}
+        transparent
+        opacity={DIM_OPACITY}
+        lineWidth={1.2}
+      />
+      <Line
+        points={[off(end, -1), off(end, 1)]}
+        color={DIM_COLOR}
+        transparent
+        opacity={DIM_OPACITY}
+        lineWidth={1.2}
+      />
+      <Html
+        position={mid}
+        center
+        style={{ pointerEvents: "none" }}
+        distanceFactor={6}
+      >
+        <span className="rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-semibold text-white whitespace-nowrap select-none">
+          {label}
+        </span>
+      </Html>
+    </group>
+  );
+}
+
+// ─── Orientation Arrow (cone + cylinder) ────────────────────────────────────
+
+function OrientationArrow({
+  position,
+  direction,
+  length = 0.6,
+}: {
+  position: [number, number, number];
+  direction: "up" | "forward";
+  length?: number;
+}) {
+  const shaftR = 0.025;
+  const headH = 0.18;
+  const headR = 0.08;
+  const shaftLen = Math.max(length - headH, 0.05);
+
+  // Cone default points along +Y; rotate to +Z if "forward".
+  const groupRot: [number, number, number] =
+    direction === "up" ? [0, 0, 0] : [Math.PI / 2, 0, 0];
+
+  return (
+    <group position={position} rotation={groupRot}>
+      <mesh position={[0, shaftLen / 2, 0]}>
+        <cylinderGeometry args={[shaftR, shaftR, shaftLen, 12]} />
+        <meshStandardMaterial
+          color="#d41111"
+          emissive="#d41111"
+          emissiveIntensity={0.4}
+        />
+      </mesh>
+      <mesh position={[0, shaftLen + headH / 2, 0]}>
+        <coneGeometry args={[headR, headH, 16]} />
+        <meshStandardMaterial
+          color="#d41111"
+          emissive="#d41111"
+          emissiveIntensity={0.5}
+        />
+      </mesh>
+    </group>
+  );
+}
+
+// ─── Per-piece floating label ───────────────────────────────────────────────
+
+function PieceLabel({
+  position,
+  gauge,
+  weightTon,
+  dimensionsMm,
+}: {
+  position: [number, number, number];
+  gauge: string;
+  weightTon: number;
+  dimensionsMm: { width: number; height: number; length: number };
+}) {
+  return (
+    <Html
+      position={position}
+      center
+      style={{ pointerEvents: "none" }}
+      distanceFactor={6}
+    >
+      <div className="rounded-md bg-black/80 px-2 py-1 text-[10px] font-semibold leading-tight text-white whitespace-nowrap select-none shadow-lg">
+        <div className="text-amber-300">{gauge}</div>
+        <div>{weightTon.toFixed(2)}t</div>
+        <div className="text-slate-300">
+          {dimensionsMm.width} × {dimensionsMm.length} × {dimensionsMm.height}mm
+        </div>
+      </div>
+    </Html>
+  );
+}
+
+// ─── Per-piece overlays (dimensions + arrow + label, only when selected) ────
+
+function PieceOverlays({
+  piece,
+  product,
+  isCoil,
+  orientation,
+  innerRadiusM,
+}: {
+  piece: UnityPiece;
+  product: ProductRecord | undefined;
+  isCoil: boolean;
+  orientation: string;
+  innerRadiusM: number;
+}) {
+  const { width, height, length } = piece.dimensions_m;
+  const { x, y, z } = piece.position_m;
+
+  if (isCoil) {
+    const isH = orientation === "H";
+    // For H (eye horizontal/lying flat): outer diameter spans X (width) and Z (length=ext_d), height = mat_w (cyl axis along Y? no — re-check).
+    // CoilPiece geometry: when isH (orientation H), profile rotation is identity (axis along Y) — so radius is in XZ, height along Y.
+    // When !isH (V/EYE), rotation Z=π/2, axis along X — radius is in YZ.
+    const outerR = isH ? width / 2 : height / 2;
+    const cylH = isH ? height : width;
+
+    if (isH) {
+      // Diameter line on top of coil (across X), at top of cylinder (y + cylH/2)
+      const top = y + cylH / 2 + 0.05;
+      const diameterLabel = `Ø${piece.dimensions_mm.width}mm`;
+      const heightLabel = `${piece.dimensions_mm.height}mm`;
+      const sideX = x + outerR + 0.15;
+      return (
+        <>
+          <DimensionLine
+            start={[x - outerR, top, z]}
+            end={[x + outerR, top, z]}
+            label={diameterLabel}
+            tickAxis="z"
+          />
+          <DimensionLine
+            start={[sideX, y - cylH / 2, z]}
+            end={[sideX, y + cylH / 2, z]}
+            label={heightLabel}
+            tickAxis="x"
+          />
+          <OrientationArrow
+            position={[x, y - innerRadiusM * 0.2, z]}
+            direction="up"
+            length={Math.max(cylH * 0.8, 0.4)}
+          />
+          <PieceLabel
+            position={[x, y + cylH / 2 + 0.45, z]}
+            gauge={product?.gauge ?? "—"}
+            weightTon={piece.weight_ton}
+            dimensionsMm={piece.dimensions_mm}
+          />
+        </>
+      );
+    }
+
+    // V / EYE (axis along X): diameter is in YZ plane, height along X
+    const top = y + outerR + 0.05;
+    const diameterLabel = `Ø${piece.dimensions_mm.height}mm`;
+    const widthLabel = `${piece.dimensions_mm.width}mm`;
+    const sideX = x + cylH / 2 + 0.15;
+    return (
+      <>
+        <DimensionLine
+          start={[x, top, z - outerR]}
+          end={[x, top, z + outerR]}
+          label={diameterLabel}
+          tickAxis="x"
+        />
+        <DimensionLine
+          start={[x - cylH / 2, y + outerR + 0.2, z]}
+          end={[x + cylH / 2, y + outerR + 0.2, z]}
+          label={widthLabel}
+          tickAxis="z"
+        />
+        <OrientationArrow
+          position={[x, y, z]}
+          direction="forward"
+          length={Math.max(outerR * 1.6, 0.4)}
+        />
+        <PieceLabel
+          position={[sideX + 0.4, y + outerR + 0.3, z]}
+          gauge={product?.gauge ?? "—"}
+          weightTon={piece.weight_ton}
+          dimensionsMm={piece.dimensions_mm}
+        />
+      </>
+    );
+  }
+
+  // Sheet: width across X, length across Z, top dimensions
+  const top = y + height / 2 + 0.05;
+  return (
+    <>
+      <DimensionLine
+        start={[x - width / 2, top, z - length / 2 - 0.1]}
+        end={[x + width / 2, top, z - length / 2 - 0.1]}
+        label={`${piece.dimensions_mm.width}mm`}
+        tickAxis="z"
+      />
+      <DimensionLine
+        start={[x + width / 2 + 0.1, top, z - length / 2]}
+        end={[x + width / 2 + 0.1, top, z + length / 2]}
+        label={`${piece.dimensions_mm.length}mm`}
+        tickAxis="x"
+      />
+      <PieceLabel
+        position={[x, top + 0.35, z]}
+        gauge={product?.gauge ?? "—"}
+        weightTon={piece.weight_ton}
+        dimensionsMm={piece.dimensions_mm}
+      />
+    </>
   );
 }
 
@@ -313,22 +582,33 @@ function PalletGroup({
                   2) *
                 0.4;
 
-            return isCoil ? (
-              <CoilPiece
-                key={piece.id}
-                piece={piece}
-                orientation={pallet.orientation}
-                innerRadiusM={innerR}
-                color={color}
-                selected={selected}
-              />
-            ) : (
-              <SheetPiece
-                key={piece.id}
-                piece={piece}
-                color={color}
-                selected={selected}
-              />
+            return (
+              <group key={piece.id}>
+                {isCoil ? (
+                  <CoilPiece
+                    piece={piece}
+                    orientation={pallet.orientation}
+                    innerRadiusM={innerR}
+                    color={color}
+                    selected={selected}
+                  />
+                ) : (
+                  <SheetPiece
+                    piece={piece}
+                    color={color}
+                    selected={selected}
+                  />
+                )}
+                {selected && (
+                  <PieceOverlays
+                    piece={piece}
+                    product={product}
+                    isCoil={isCoil}
+                    orientation={pallet.orientation}
+                    innerRadiusM={innerR}
+                  />
+                )}
+              </group>
             );
           })}
         </group>
@@ -407,10 +687,10 @@ function PalletScene({
 
   return (
     <>
-      <ambientLight intensity={0.3} />
+      <ambientLight intensity={0.6} />
       <directionalLight
         position={[8, 15, 10]}
-        intensity={1.2}
+        intensity={1.4}
         castShadow
         shadow-mapSize-width={2048}
         shadow-mapSize-height={2048}
@@ -420,8 +700,8 @@ function PalletScene({
         shadow-camera-top={20}
         shadow-camera-bottom={-20}
       />
-      <directionalLight position={[-5, 8, -5]} intensity={0.3} />
-      <hemisphereLight args={["#b1c8ff", "#2c1f12", 0.35]} />
+      <directionalLight position={[-5, 8, -5]} intensity={0.5} />
+      <hemisphereLight args={["#b1c8ff", "#2c1f12", 0.55]} />
 
       <fog attach="fog" args={["#0c0f16", 18, 45]} />
 
@@ -689,6 +969,133 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
+// ─── Assembly Instructions Panel ────────────────────────────────────────────
+
+function AssemblyInstructions({
+  payload,
+  productMap,
+  selectedPallet,
+  collapsed,
+  onSelectPallet,
+  onToggleCollapsed,
+}: {
+  payload: UnityPalletPayload;
+  productMap: Map<string, ProductRecord>;
+  selectedPallet: number | null;
+  collapsed: boolean;
+  onSelectPallet: (n: number | null) => void;
+  onToggleCollapsed: () => void;
+}) {
+  if (collapsed) {
+    return (
+      <button
+        type="button"
+        onClick={onToggleCollapsed}
+        className="absolute bottom-16 left-4 z-10 flex items-center gap-1.5 rounded-lg border border-slate-700/60 bg-slate-900/95 px-3 py-2 text-xs font-bold text-white shadow-xl backdrop-blur-sm transition-colors hover:bg-slate-800"
+      >
+        <AppIcon name="receipt_long" className="text-sm" />
+        Pasos de armado ({payload.pallets.length})
+      </button>
+    );
+  }
+
+  return (
+    <div className="absolute bottom-16 left-4 z-10 w-[280px] rounded-xl border border-slate-700/60 bg-slate-900/95 shadow-xl backdrop-blur-sm">
+      <div className="flex items-center justify-between border-b border-slate-700/50 px-3 py-2">
+        <h3 className="flex items-center gap-1.5 text-sm font-bold text-white">
+          <AppIcon name="receipt_long" className="text-sm" />
+          Pasos de armado
+        </h3>
+        <button
+          type="button"
+          onClick={onToggleCollapsed}
+          aria-label="Colapsar panel"
+          className="rounded-md p-1 text-slate-400 transition-colors hover:bg-slate-800 hover:text-white"
+        >
+          <AppIcon name="close" className="text-sm" />
+        </button>
+      </div>
+
+      <div className="max-h-[320px] space-y-2 overflow-y-auto p-3">
+        {payload.pallets.map((pallet, idx) => {
+          const isCoil = pallet.packing_mode === "width";
+          const stepNum = idx + 1;
+          const isSelected = selectedPallet === pallet.pallet_number;
+          const firstPiece = pallet.pieces[0];
+          const product = firstPiece
+            ? productMap.get(firstPiece.product_id)
+            : undefined;
+          const pieceWeight = firstPiece?.weight_ton ?? 0;
+          const d = pallet.dimensions_mm;
+          const orientationText =
+            pallet.orientation === "H"
+              ? "ojo vertical (H)"
+              : pallet.orientation === "V"
+                ? "ojo horizontal (V)"
+                : pallet.orientation === "EYE"
+                  ? "ojo horizontal (EYE)"
+                  : pallet.orientation;
+
+          const description = isCoil
+            ? `Colocar ${pallet.pieces.length} rollo${pallet.pieces.length !== 1 ? "s" : ""} de ${pieceWeight.toFixed(2)}t c/u, ${orientationText}, en tarima ${d.width} × ${d.length}mm`
+            : `Colocar ${pallet.pieces.length} lámina${pallet.pieces.length !== 1 ? "s" : ""} de ${pieceWeight.toFixed(2)}t c/u, apiladas, base ${d.width} × ${d.length}mm`;
+
+          return (
+            <button
+              key={pallet.pallet_number}
+              type="button"
+              onClick={() => onSelectPallet(pallet.pallet_number)}
+              className={`flex w-full items-start gap-3 rounded-lg p-2 text-left transition-colors ${
+                isSelected
+                  ? "border border-[#d41111] bg-[#d41111]/10"
+                  : "border border-transparent bg-slate-800/40 hover:bg-slate-800"
+              }`}
+            >
+              <div
+                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
+                  isSelected
+                    ? "bg-[#d41111] text-white"
+                    : "bg-slate-700 text-slate-300"
+                }`}
+              >
+                {stepNum}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-bold text-white">
+                    Tarima #{pallet.pallet_number}
+                  </span>
+                  <span
+                    className={`shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase ${
+                      isCoil
+                        ? "bg-blue-500/15 text-blue-300"
+                        : "bg-amber-500/15 text-amber-300"
+                    }`}
+                  >
+                    {isCoil ? "Rollos" : "Láminas"}
+                  </span>
+                </div>
+                <p className="mt-0.5 text-[10px] leading-tight text-slate-300">
+                  {description}
+                </p>
+                <div className="mt-1 flex items-center gap-2 text-[10px] text-slate-500">
+                  {product?.gauge && (
+                    <span className="font-medium text-slate-300">
+                      {product.gauge}
+                    </span>
+                  )}
+                  <span>·</span>
+                  <span>{pallet.total_weight_ton.toFixed(2)}t total</span>
+                </div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Component ─────────────────────────────────────────────────────────
 
 export function UnitySimulator({
@@ -720,6 +1127,7 @@ export function UnitySimulator({
 
   const [handMode, setHandMode] = useState(false);
   const [showHandConsent, setShowHandConsent] = useState(false);
+  const [instructionsCollapsed, setInstructionsCollapsed] = useState(false);
   const [sensitivity, setSensitivity] = useState<number>(() => {
     if (typeof window === "undefined") return SENSITIVITY_DEFAULT;
     const stored = window.localStorage.getItem(GESTURE_SENSITIVITY_KEY);
@@ -1008,6 +1416,22 @@ export function UnitySimulator({
             productMap={productMap}
             onRotateLeft={() => rotatePallet(-1)}
             onRotateRight={() => rotatePallet(1)}
+          />
+        )}
+
+        {hasPayload && payload && !loading && (
+          <AssemblyInstructions
+            payload={payload}
+            productMap={productMap}
+            selectedPallet={selectedPallet}
+            collapsed={instructionsCollapsed}
+            onSelectPallet={(n) => {
+              setSelectedPallet(n);
+              sfx.select();
+            }}
+            onToggleCollapsed={() =>
+              setInstructionsCollapsed((v) => !v)
+            }
           />
         )}
 
