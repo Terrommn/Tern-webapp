@@ -27,6 +27,7 @@ import {
   Menu,
   Package,
   ReceiptText,
+  RotateCcw,
   Route,
   Scale,
   Scroll,
@@ -40,6 +41,7 @@ import {
   Trophy,
   TrendingUp,
   Users,
+  Webcam,
   X,
   Zap,
 } from "lucide-react";
@@ -77,6 +79,7 @@ const ICONS = {
   precision_manufacturing: Factory,
   progress_activity: LoaderCircle,
   receipt_long: ReceiptText,
+  rotate_ccw: RotateCcw,
   route: Route,
   scale: Scale,
   scroll: Scroll,
@@ -90,6 +93,7 @@ const ICONS = {
   timer: Timer,
   trending_up: TrendingUp,
   view_in_ar: Box,
+  webcam: Webcam,
   zap: Zap,
 } as const;
 

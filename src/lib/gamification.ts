@@ -17,6 +17,7 @@ export const XP_VALUES: Record<string, number> = {
   view_detail: 5,
   simulator_used: 20,
   calculator_used: 15,
+  gesture_mode_first_use: 30,
 };
 
 // ── Level thresholds ────────────────────────────────────────────────────

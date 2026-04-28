@@ -5,16 +5,32 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Html } from "@react-three/drei";
 import * as THREE from "three";
+import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import type { OrderRecord } from "@/types/order";
 import type { ProductRecord } from "@/types/product";
 import { createClient } from "@/lib/supabase/client";
 import { useGamificationContext } from "@/components/steelflow/GamificationProvider";
+import { useHandTracker } from "@/lib/hooks/useHandTracker";
+import HandControlsOverlay from "@/components/steelflow/HandControlsOverlay";
+import HandCameraDriver from "@/components/steelflow/HandCameraDriver";
 import {
   createUnityPalletPayloadFromLayout,
   type UnityPalletPayload,
   type UnityPallet,
   type UnityPiece,
 } from "@/lib/pallet-calculator";
+
+const GESTURE_XP_SESSION_KEY = "sf-gesture-xp-awarded";
+const GESTURE_CONSENT_KEY = "sf-gesture-consent";
+const GESTURE_SENSITIVITY_KEY = "sf-gesture-sensitivity";
+const SENSITIVITY_MIN = 0.5;
+const SENSITIVITY_MAX = 2.0;
+const SENSITIVITY_DEFAULT = 1.0;
+
+function clampSensitivity(v: number): number {
+  if (!Number.isFinite(v)) return SENSITIVITY_DEFAULT;
+  return Math.max(SENSITIVITY_MIN, Math.min(SENSITIVITY_MAX, v));
+}
 
 // ─── Sound Effects (Web Audio API — no external files) ──────────────────────
 
@@ -62,6 +78,12 @@ class SFX {
   }
   hover() {
     this.tone(500, 500, 0.05, 0.03);
+  }
+  anchor() {
+    this.tone(800, 1100, 0.08, 0.07, "sine");
+  }
+  commit() {
+    this.tone(400, 200, 0.12, 0.09, "triangle");
   }
 
   load() {
@@ -696,6 +718,49 @@ export function UnitySimulator({
   >({});
   const canvasRef = useRef<HTMLDivElement>(null);
 
+  const [handMode, setHandMode] = useState(false);
+  const [showHandConsent, setShowHandConsent] = useState(false);
+  const [sensitivity, setSensitivity] = useState<number>(() => {
+    if (typeof window === "undefined") return SENSITIVITY_DEFAULT;
+    const stored = window.localStorage.getItem(GESTURE_SENSITIVITY_KEY);
+    if (stored === null) return SENSITIVITY_DEFAULT;
+    const parsed = parseFloat(stored);
+    return Number.isFinite(parsed)
+      ? clampSensitivity(parsed)
+      : SENSITIVITY_DEFAULT;
+  });
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const orbitControlsRef = useRef<OrbitControlsImpl | null>(null);
+  const {
+    frameRef: handFrameRef,
+    status: handStatus,
+    gestureLabel: handGesture,
+    gestureScore: handGestureScore,
+    handedness: handHandedness,
+    error: handError,
+  } = useHandTracker({ enabled: handMode, videoRef });
+
+  const handleSensitivityChange = useCallback((value: number) => {
+    const next = clampSensitivity(value);
+    setSensitivity(next);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(GESTURE_SENSITIVITY_KEY, String(next));
+    }
+  }, []);
+
+  const handleResetCamera = useCallback(() => {
+    orbitControlsRef.current?.reset();
+    sfx.deselect();
+  }, []);
+
+  const handleAnchor = useCallback(() => {
+    sfx.anchor();
+  }, []);
+
+  const handleRelease = useCallback(() => {
+    sfx.commit();
+  }, []);
+
   const productMap = useMemo(
     () => new Map(products.map((p) => [p.id, p])),
     [products],
@@ -772,6 +837,52 @@ export function UnitySimulator({
 
   const handleFullscreen = useCallback(() => {
     canvasRef.current?.requestFullscreen?.();
+  }, []);
+
+  const enableHandMode = useCallback(async () => {
+    setHandMode(true);
+    sfx.select();
+    if (typeof window === "undefined") return;
+    if (sessionStorage.getItem(GESTURE_XP_SESSION_KEY) === "true") return;
+    sessionStorage.setItem(GESTURE_XP_SESSION_KEY, "true");
+    try {
+      await awardXP(
+        "gesture_mode_first_use",
+        "feature",
+        "hand_controls",
+        "Activó control por gestos",
+      );
+    } catch {
+      // XP failure should not block UX
+    }
+  }, [awardXP]);
+
+  const handleToggleHandMode = useCallback(() => {
+    if (handMode) {
+      setHandMode(false);
+      sfx.deselect();
+      return;
+    }
+    if (
+      typeof window !== "undefined" &&
+      window.localStorage.getItem(GESTURE_CONSENT_KEY) === "true"
+    ) {
+      enableHandMode();
+      return;
+    }
+    setShowHandConsent(true);
+  }, [handMode, enableHandMode]);
+
+  const handleAcceptConsent = useCallback(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(GESTURE_CONSENT_KEY, "true");
+    }
+    setShowHandConsent(false);
+    enableHandMode();
+  }, [enableHandMode]);
+
+  const handleDeclineConsent = useCallback(() => {
+    setShowHandConsent(false);
   }, []);
 
   const selectedPalletData =
@@ -900,6 +1011,61 @@ export function UnitySimulator({
           />
         )}
 
+        {handMode && (
+          <HandControlsOverlay
+            videoRef={videoRef}
+            frameRef={handFrameRef}
+            status={handStatus}
+            gestureLabel={handGesture}
+            gestureScore={handGestureScore}
+            handedness={handHandedness}
+            error={handError}
+            sensitivity={sensitivity}
+            sensitivityMin={SENSITIVITY_MIN}
+            sensitivityMax={SENSITIVITY_MAX}
+            onSensitivityChange={handleSensitivityChange}
+            onReset={handleResetCamera}
+            onClose={() => {
+              setHandMode(false);
+              sfx.deselect();
+            }}
+          />
+        )}
+
+        {showHandConsent && (
+          <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/60 p-6">
+            <div className="w-full max-w-sm rounded-xl border border-slate-700 bg-slate-900 p-5 shadow-2xl">
+              <div className="flex items-center gap-2">
+                <AppIcon name="webcam" className="text-2xl text-[#d41111]" />
+                <h3 className="text-base font-bold text-white">
+                  Activar control por gestos
+                </h3>
+              </div>
+              <p className="mt-3 text-sm text-slate-300">
+                Necesitamos acceder a tu cámara para detectar gestos de la mano
+                y mover la cámara del simulador. El video se procesa
+                localmente en tu navegador y no se envía a ningún servidor.
+              </p>
+              <div className="mt-4 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={handleDeclineConsent}
+                  className="rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-300 transition-colors hover:bg-slate-700 hover:text-white"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAcceptConsent}
+                  className="rounded-lg bg-[#d41111] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-red-600"
+                >
+                  Activar cámara
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="h-[500px] w-full cursor-grab lg:h-[650px]">
           <Canvas
             shadows
@@ -919,11 +1085,21 @@ export function UnitySimulator({
               <EmptyScene />
             )}
             <OrbitControls
+              ref={orbitControlsRef}
               makeDefault
+              enabled={!handMode}
               maxPolarAngle={Math.PI / 2.1}
               minDistance={1.5}
               maxDistance={35}
             />
+            {handMode && (
+              <HandCameraDriver
+                frameRef={handFrameRef}
+                sensitivity={sensitivity}
+                onAnchor={handleAnchor}
+                onRelease={handleRelease}
+              />
+            )}
           </Canvas>
         </div>
 
@@ -935,14 +1111,29 @@ export function UnitySimulator({
               zoom &middot; Click+arrastrar orbitar
             </span>
           </div>
-          <button
-            type="button"
-            className="flex items-center gap-1.5 rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-400 transition-colors hover:bg-slate-700 hover:text-white"
-            onClick={handleFullscreen}
-          >
-            <AppIcon className="text-sm" name="fullscreen" />
-            Pantalla Completa
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              aria-pressed={handMode}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+                handMode
+                  ? "bg-[#d41111] text-white hover:bg-red-600"
+                  : "bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white"
+              }`}
+              onClick={handleToggleHandMode}
+            >
+              <AppIcon className="text-sm" name="webcam" />
+              {handMode ? "Gestos: ON" : "Control por gestos"}
+            </button>
+            <button
+              type="button"
+              className="flex items-center gap-1.5 rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-400 transition-colors hover:bg-slate-700 hover:text-white"
+              onClick={handleFullscreen}
+            >
+              <AppIcon className="text-sm" name="fullscreen" />
+              Pantalla Completa
+            </button>
+          </div>
         </div>
       </div>
     </div>
