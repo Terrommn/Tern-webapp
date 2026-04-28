@@ -23,11 +23,24 @@ function isAllowed(pathname: string, role: AppRole): boolean {
 }
 
 export async function proxy(request: NextRequest) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey =
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY;
+
+  if (!supabaseUrl || !supabaseKey) {
+    console.error(
+      "[proxy] Missing env vars:",
+      { url: !!supabaseUrl, key: !!supabaseKey }
+    );
+    return NextResponse.next();
+  }
+
   let response = NextResponse.next({ request: { headers: request.headers } });
 
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl,
+    supabaseKey,
     {
       cookies: {
         getAll: () => request.cookies.getAll(),
