@@ -208,7 +208,11 @@ export function ProductsWorkspace({
     }
 
     setProducts((current) => [newProduct, ...current]);
-    awardXP("product_created", "product", newProduct.id);
+    try {
+      await awardXP("product_created", "product", newProduct.id, "Producto creado");
+    } catch (err) {
+      console.error("Gamification error (product_created):", err);
+    }
     setSelectedProductId(newProduct.id);
     setForm(createFormState(clients, newProduct));
     setQuery("");
@@ -254,7 +258,13 @@ export function ProductsWorkspace({
     const updatedProduct = error
       ? { ...selectedProduct, ...payload, updated_at: new Date().toISOString() }
       : (data as ProductRecord);
-    if (!error) awardXP("product_updated", "product", updatedProduct.id);
+    if (!error) {
+      try {
+        await awardXP("product_updated", "product", updatedProduct.id, "Producto actualizado");
+      } catch (err) {
+        console.error("Gamification error (product_updated):", err);
+      }
+    }
 
     setProducts((current) =>
       current.map((product) =>

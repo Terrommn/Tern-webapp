@@ -130,7 +130,13 @@ export function ClientsDirectory({
     } else {
       setClients((current) => [data as ClientRecord, ...current]);
     }
-    if (!error && data) awardXP("client_created", "client", data.id);
+    if (!error && data) {
+      try {
+        await awardXP("client_created", "client", data.id, "Cliente creado");
+      } catch (xpError) {
+        console.error("Gamification XP award failed:", xpError);
+      }
+    }
 
     setQuery("");
     handleCloseCreate();

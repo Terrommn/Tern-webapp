@@ -162,7 +162,11 @@ export function OrdersWorkspace({
     const supabase = createSupabaseClient();
     await supabase.from("orders").update({ status: "CUM", updated_at: new Date().toISOString() }).eq("id", order.id).eq("line_number", order.line_number);
     setOrders((prev) => prev.map((o) => o.id === order.id && o.line_number === order.line_number ? { ...o, status: "CUM" } : o));
-    await awardXP("order_cumplida", "order", String(order.id), "Orden completada correctamente");
+    try {
+      await awardXP("order_cumplida", "order", String(order.id), "Orden completada correctamente");
+    } catch (e) {
+      console.error("Gamification error (order_cumplida):", e);
+    }
   }
 
   function handleClientChange(client_id: string) {
@@ -261,7 +265,11 @@ export function OrdersWorkspace({
     }
 
     setOrders((current) => [...newOrders, ...current]);
-    awardXP("order_created", "order", newOrders[0]?.id?.toString());
+    try {
+      await awardXP("order_created", "order", newOrders[0]?.id?.toString(), "Orden creada");
+    } catch (e) {
+      console.error("Gamification error (order_created):", e);
+    }
     setSelectedOrderKey(orderKey(newOrders[0]));
     setQuery("");
     handleCloseCreate();
