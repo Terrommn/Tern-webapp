@@ -26,6 +26,7 @@ import type {
   UserQuest,
   XPToastItem,
 } from "@/types/gamification";
+import { MilestoneOverlay } from "./MilestoneOverlay";
 import { QuestProgressPill } from "./QuestProgressPill";
 import { XPToast } from "./XPToast";
 
@@ -61,6 +62,13 @@ export function GamificationProvider({ children }: { children: ReactNode }) {
   const [achievements, setAchievements] = useState<UserAchievement[]>([]);
   const [loading, setLoading] = useState(true);
   const [toasts, setToasts] = useState<XPToastItem[]>([]);
+  const [milestone, setMilestone] = useState<{
+    visible: boolean;
+    title: string;
+    description: string;
+    xp: number;
+    icon: string;
+  }>({ visible: false, title: "", description: "", xp: 0, icon: "emoji_events" });
 
   // ── Toast management ────────────────────────────────────────────────
 
@@ -173,6 +181,13 @@ export function GamificationProvider({ children }: { children: ReactNode }) {
 
       if (result.leveledUp) {
         pushToast(`Nivel ${result.newLevel} alcanzado`, 0);
+        setMilestone({
+          visible: true,
+          title: `Nivel ${result.newLevel}`,
+          description: "Has subido de nivel. Sigue asi.",
+          xp: xpAmount,
+          icon: "emoji_events",
+        });
       }
 
       await refreshProfile();
@@ -217,6 +232,14 @@ export function GamificationProvider({ children }: { children: ReactNode }) {
         visible={quests.length > 0}
       />
       <XPToast toasts={toasts} onDismiss={dismissToast} />
+      <MilestoneOverlay
+        visible={milestone.visible}
+        title={milestone.title}
+        description={milestone.description}
+        xp={milestone.xp}
+        icon={milestone.icon}
+        onDismiss={() => setMilestone((m) => ({ ...m, visible: false }))}
+      />
     </GamificationContext.Provider>
   );
 }

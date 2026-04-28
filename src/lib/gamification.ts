@@ -250,10 +250,23 @@ export async function updateRingProgress(
     (flowClosed ? 1 : 0) + (tonnageClosed ? 1 : 0) + (reachClosed ? 1 : 0);
   const isTripleClose = ringsClosed === 3;
 
+  const heatmapScore = ringsClosed * 25 + (isTripleClose ? 25 : 0);
+  const heatmapLevel = isTripleClose
+    ? 4
+    : ringsClosed >= 2
+      ? 3
+      : ringsClosed >= 1
+        ? 2
+        : newValue > 0
+          ? 1
+          : 0;
+
   const updates: Record<string, unknown> = {
     [col]: newValue,
     rings_closed: ringsClosed,
     is_triple_close: isTripleClose,
+    heatmap_score: heatmapScore,
+    heatmap_level: heatmapLevel,
     last_activity_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
