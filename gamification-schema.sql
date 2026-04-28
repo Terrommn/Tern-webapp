@@ -19,6 +19,10 @@ CREATE TABLE public.level_definitions (
   perk_description TEXT
 );
 
+ALTER TABLE public.level_definitions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Public read level definitions"
+  ON public.level_definitions FOR SELECT USING (true);
+
 INSERT INTO public.level_definitions (level, title_en, title_es, xp_required, perk_description) VALUES
   (1,  'Forge Apprentice',     'Aprendiz de Forja',          0,     'Perfil basico y onboarding quest chain'),
   (2,  'Steel Initiate',       'Iniciado del Acero',         200,   'Indicador de nivel visible en sidebar'),
@@ -109,6 +113,8 @@ CREATE INDEX idx_xp_events_action ON public.xp_events (action_type);
 ALTER TABLE public.xp_events ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users view own xp events"
   ON public.xp_events FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users create own xp events"
+  ON public.xp_events FOR INSERT WITH CHECK (auth.uid() = user_id);
 
 
 -- ════════════════════════════════════════════════════════════════════════════

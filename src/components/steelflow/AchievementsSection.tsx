@@ -34,11 +34,11 @@ const TIER_COLORS: Record<string, string> = {
 
 const CATEGORIES = [
   { key: "all", label: "Todos" },
-  { key: "ordenes", label: "Ordenes" },
-  { key: "clientes", label: "Clientes" },
-  { key: "productos", label: "Productos" },
-  { key: "sistema", label: "Sistema" },
-  { key: "consistencia", label: "Consistencia" },
+  { key: "order_management", label: "Ordenes" },
+  { key: "client_relations", label: "Clientes" },
+  { key: "product_knowledge", label: "Productos" },
+  { key: "system_mastery", label: "Sistema" },
+  { key: "consistency", label: "Consistencia" },
 ];
 
 export function AchievementsSection({
