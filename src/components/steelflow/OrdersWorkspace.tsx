@@ -464,7 +464,7 @@ export function OrdersWorkspace({
                 Ver en Simulador 3D
               </Link>
 
-              {isOperator && selectedOrder.status === "ARM" && (
+              {selectedOrder.status === "ARM" && (
                 <button
                   type="button"
                   onClick={() => handleMarkCUM(selectedOrder)}
@@ -475,14 +475,14 @@ export function OrdersWorkspace({
                 </button>
               )}
 
-              {isOperator && selectedOrder.status === "CUM" && (
+              {selectedOrder.status === "CUM" && (
                 <div className="flex items-center justify-center gap-2 rounded-2xl bg-emerald-500/10 px-5 py-3 text-sm font-semibold text-emerald-600 dark:text-emerald-400">
                   <AppIcon className="text-lg" name="check_circle" />
                   Orden completada
                 </div>
               )}
 
-              {isOperator && selectedOrder.status === "PEN" && (
+              {selectedOrder.status === "PEN" && (
                 <div className="flex items-center justify-center gap-2 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-5 py-3 text-sm font-semibold text-amber-600 dark:text-amber-400">
                   <AppIcon className="text-lg" name="info" />
                   Visualiza en Simulador para armar

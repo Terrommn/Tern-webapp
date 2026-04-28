@@ -96,7 +96,7 @@ export async function awardXP(
   description?: string,
 ): Promise<{ newTotalXP: number; newLevel: number; leveledUp: boolean }> {
   // 1. Insert XP event
-  await supabase.from("xp_events").insert({
+  const { error: insertError } = await supabase.from("xp_events").insert({
     user_id: userId,
     action_type: actionType,
     xp_amount: xpAmount,
@@ -105,6 +105,10 @@ export async function awardXP(
     source: source ?? "app",
     description: description ?? null,
   });
+
+  if (insertError) {
+    console.error("[gamification] Failed to insert xp_event:", insertError.message, insertError.code);
+  }
 
   // 2. Fetch current profile
   const { data: profile } = await supabase

@@ -2,8 +2,6 @@ import { AppIcon } from "@/components/ui/app-icon";
 import { AuthShell } from "@/components/steelflow/AuthShell";
 import { createClient } from "@/lib/supabase/server";
 
-const DEMO_USER_ID = "00000000-0000-0000-0000-000000000001";
-
 const LEVEL_THRESHOLDS = [
   { level: 1, xp: 0 },
   { level: 2, xp: 200 },
@@ -21,6 +19,7 @@ const LEVEL_THRESHOLDS = [
 
 export default async function SteelFlowProDashboardPage() {
   const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
 
   // Fetch all tables in parallel
   const [ordersRes, clientsRes, productsRes, profileRes, levelDefsRes] =
@@ -34,7 +33,7 @@ export default async function SteelFlowProDashboardPage() {
       supabase
         .from("user_profiles")
         .select("*")
-        .eq("id", DEMO_USER_ID)
+        .eq("id", user?.id ?? "")
         .maybeSingle(),
       supabase
         .from("level_definitions")
