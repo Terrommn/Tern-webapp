@@ -101,7 +101,7 @@ export async function proxy(request: NextRequest) {
   // Set role cookie (not httpOnly so client can read for UI rendering)
   response.cookies.set("sf-role", role, {
     path: "/",
-    httpOnly: false,
+    httpOnly: true,
     sameSite: "lax",
     maxAge: 60 * 60 * 8,
   });

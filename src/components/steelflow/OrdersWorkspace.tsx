@@ -163,7 +163,7 @@ export function OrdersWorkspace({
     await supabase.from("orders").update({ status: "CUM", updated_at: new Date().toISOString() }).eq("id", order.id).eq("line_number", order.line_number);
     setOrders((prev) => prev.map((o) => o.id === order.id && o.line_number === order.line_number ? { ...o, status: "CUM" } : o));
     try {
-      await awardXP("order_cumplida", "order", String(order.id), "Orden completada correctamente");
+      await awardXP("order_cumplida", "order", String(order.id), "Orden completada correctamente", { tonnage: Number(order.net_weight_ton) || 0 });
     } catch (e) {
       console.error("Gamification error (order_cumplida):", e);
     }
@@ -266,7 +266,8 @@ export function OrdersWorkspace({
 
     setOrders((current) => [...newOrders, ...current]);
     try {
-      await awardXP("order_created", "order", newOrders[0]?.id?.toString(), "Orden creada");
+      const totalTonnage = rows.reduce((sum, r) => sum + (Number(r.net_weight_ton) || 0), 0);
+      await awardXP("order_created", "order", newOrders[0]?.id?.toString(), "Orden creada", { tonnage: totalTonnage });
     } catch (e) {
       console.error("Gamification error (order_created):", e);
     }

@@ -1,5 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { DailyActivity, UserProfile } from "@/types/gamification";
+import type {
+  AchievementDefinition,
+  DailyActivity,
+  UserProfile,
+} from "@/types/gamification";
 
 // ── XP reward values ────────────────────────────────────────────────────
 
@@ -95,7 +99,33 @@ export async function awardXP(
   entityId?: string,
   source?: string,
   description?: string,
+  metadata?: Record<string, unknown>,
 ): Promise<{ newTotalXP: number; newLevel: number; leveledUp: boolean }> {
+  // Dedup: skip if identical event exists within the last 5 seconds
+  if (entityId) {
+    const cutoff = new Date(Date.now() - 5000).toISOString();
+    const { data: recent } = await supabase
+      .from("xp_events")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("action_type", actionType)
+      .eq("entity_id", entityId)
+      .gte("created_at", cutoff)
+      .limit(1);
+    if (recent && recent.length > 0) {
+      const { data: profile } = await supabase
+        .from("user_profiles")
+        .select("total_xp, current_level")
+        .eq("id", userId)
+        .single();
+      return {
+        newTotalXP: (profile?.total_xp ?? 0) as number,
+        newLevel: (profile?.current_level ?? 1) as number,
+        leveledUp: false,
+      };
+    }
+  }
+
   // 1. Insert XP event
   const { error: insertError } = await supabase.from("xp_events").insert({
     user_id: userId,
@@ -108,13 +138,13 @@ export async function awardXP(
   });
 
   if (insertError) {
-    console.error("[gamification] Failed to insert xp_event:", insertError.message, insertError.code);
+    throw new Error(`[gamification] Failed to insert xp_event: ${insertError.message}`);
   }
 
   // 2. Fetch current profile
   const { data: profile } = await supabase
     .from("user_profiles")
-    .select("total_xp, current_level")
+    .select("total_xp, current_level, total_orders_created, total_clients_created, total_products_created, total_tonnage_processed")
     .eq("id", userId)
     .single();
 
@@ -124,7 +154,7 @@ export async function awardXP(
   const newLevel = getLevelForXP(newTotalXP);
   const leveledUp = newLevel > oldLevel;
 
-  // 3. Update profile
+  // 3. Update profile (XP + level + aggregate counters)
   const updates: Record<string, unknown> = {
     total_xp: newTotalXP,
     updated_at: new Date().toISOString(),
@@ -132,8 +162,28 @@ export async function awardXP(
   if (leveledUp) {
     updates.current_level = newLevel;
   }
+  if (actionType === "order_created") {
+    updates.total_orders_created = ((profile?.total_orders_created ?? 0) as number) + 1;
+  }
+  if (actionType === "client_created") {
+    updates.total_clients_created = ((profile?.total_clients_created ?? 0) as number) + 1;
+  }
+  if (actionType === "product_created") {
+    updates.total_products_created = ((profile?.total_products_created ?? 0) as number) + 1;
+  }
+  if (metadata?.tonnage) {
+    updates.total_tonnage_processed =
+      ((profile?.total_tonnage_processed ?? 0) as number) + Number(metadata.tonnage);
+  }
 
-  await supabase.from("user_profiles").update(updates).eq("id", userId);
+  const { error: updateError } = await supabase
+    .from("user_profiles")
+    .update(updates)
+    .eq("id", userId);
+
+  if (updateError) {
+    console.error("[gamification] Failed to update profile:", updateError.message);
+  }
 
   return { newTotalXP, newLevel, leveledUp };
 }
@@ -202,6 +252,35 @@ export async function getOrCreateDailyActivity(
     .single();
 
   return (created as DailyActivity) ?? null;
+}
+
+/**
+ * Increment daily_activity counters (orders_created, orders_completed, xp_earned).
+ * Called after every XP award so the heatmap and activity history stay current.
+ */
+export async function updateDailyActivityCounters(
+  supabase: SupabaseClient,
+  userId: string,
+  actionType: string,
+  xpAmount: number,
+): Promise<void> {
+  const activity = await getOrCreateDailyActivity(supabase, userId);
+  if (!activity) return;
+
+  const updates: Record<string, unknown> = {
+    xp_earned: ((activity.xp_earned ?? 0) as number) + xpAmount,
+    last_activity_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
+  if (actionType === "order_created") {
+    updates.orders_created = ((activity.orders_created ?? 0) as number) + 1;
+  }
+  if (actionType === "order_cumplida" || actionType === "order_completed") {
+    updates.orders_completed = ((activity.orders_completed ?? 0) as number) + 1;
+  }
+
+  await supabase.from("daily_activity").update(updates).eq("id", activity.id);
 }
 
 /**
@@ -352,4 +431,318 @@ export async function checkAndUpdateStreak(
     .eq("id", userId);
 
   return { streakDays, streakBroken };
+}
+
+// ── Achievement unlock ─────────────────────────────────────────────────
+
+const CRITERIA_COUNTER_MAP: Record<string, keyof UserProfile> = {
+  total_orders: "total_orders_created",
+  total_clients: "total_clients_created",
+  total_products: "total_products_created",
+  total_tonnage: "total_tonnage_processed",
+};
+
+export async function checkAndUnlockAchievements(
+  supabase: SupabaseClient,
+  userId: string,
+  _actionType: string,
+): Promise<AchievementDefinition[]> {
+  const [{ data: allDefs }, { data: userAch }, { data: profile }] =
+    await Promise.all([
+      supabase.from("achievement_definitions").select("*"),
+      supabase
+        .from("user_achievements")
+        .select("achievement_id")
+        .eq("user_id", userId),
+      supabase.from("user_profiles").select("*").eq("id", userId).single(),
+    ]);
+
+  if (!allDefs || !profile) return [];
+
+  const unlockedIds = new Set(
+    (userAch ?? []).map((a: { achievement_id: string }) => a.achievement_id),
+  );
+  const newlyUnlocked: AchievementDefinition[] = [];
+
+  for (const def of allDefs as AchievementDefinition[]) {
+    if (unlockedIds.has(def.id)) continue;
+    if (!def.criteria_type || !def.criteria_target) continue;
+
+    const target = def.criteria_target as Record<string, unknown>;
+    const threshold = Number(target.threshold ?? target.count ?? 0);
+    let qualifies = false;
+
+    if (def.criteria_type === "count") {
+      const field =
+        CRITERIA_COUNTER_MAP[target.field as string] ??
+        (target.field as keyof UserProfile);
+      const current = Number((profile as Record<string, unknown>)[field] ?? 0);
+      qualifies = current >= threshold;
+    } else if (def.criteria_type === "cumulative") {
+      const current = Number(profile.total_tonnage_processed ?? 0);
+      qualifies = current >= threshold;
+    } else if (def.criteria_type === "streak") {
+      const current = Math.max(
+        Number(profile.current_streak_days ?? 0),
+        Number(profile.longest_streak_days ?? 0),
+      );
+      qualifies = current >= threshold;
+    }
+
+    if (qualifies) {
+      const { error } = await supabase
+        .from("user_achievements")
+        .insert({ user_id: userId, achievement_id: def.id })
+        .select()
+        .single();
+      if (!error) newlyUnlocked.push(def);
+    }
+  }
+
+  return newlyUnlocked;
+}
+
+// ── Quest progress ─────────────────────────────────────────────────────
+
+const ACTION_TO_QUEST_TARGET: Record<string, string[]> = {
+  order_created: ["create_order", "order_created"],
+  order_cumplida: ["complete_order", "order_cumplida"],
+  order_assembled: ["assemble_order", "order_assembled"],
+  client_created: ["create_client", "client_created"],
+  product_created: ["create_product", "product_created"],
+  product_updated: ["update_product", "product_updated"],
+  simulator_used: ["use_simulator", "simulator_used"],
+};
+
+export async function updateQuestProgress(
+  supabase: SupabaseClient,
+  userId: string,
+  actionType: string,
+): Promise<{ xp_reward: number; title: string | null }[]> {
+  const targets = ACTION_TO_QUEST_TARGET[actionType];
+  if (!targets) return [];
+
+  const { data: activeQuests } = await supabase
+    .from("user_quests")
+    .select("*, quest_definitions(*)")
+    .eq("user_id", userId)
+    .eq("status", "active");
+
+  if (!activeQuests) return [];
+
+  const completed: { xp_reward: number; title: string | null }[] = [];
+
+  for (const uq of activeQuests) {
+    const def = uq.quest_definitions;
+    if (!def) continue;
+    if (!targets.includes(def.target_action ?? "")) continue;
+
+    const newProgress = (uq.current_progress ?? 0) + 1;
+    const targetCount = uq.target_count ?? def.target_count ?? 1;
+    const isDone = newProgress >= targetCount;
+
+    const updates: Record<string, unknown> = {
+      current_progress: newProgress,
+    };
+    if (isDone) {
+      updates.status = "completed";
+      updates.completed_at = new Date().toISOString();
+      updates.xp_awarded = def.xp_reward ?? 0;
+    }
+
+    await supabase.from("user_quests").update(updates).eq("id", uq.id);
+
+    if (isDone) {
+      completed.push({ xp_reward: def.xp_reward ?? 0, title: def.title });
+    }
+  }
+
+  return completed;
+}
+
+// ── Challenge assignment ───────────────────────────────────────────────
+
+export async function ensureActiveChallenges(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<void> {
+  const today = new Date().toISOString().slice(0, 10);
+
+  const { data: existing } = await supabase
+    .from("user_challenges")
+    .select("challenge_id, period_start, challenge_definitions(duration)")
+    .eq("user_id", userId)
+    .gte("period_end", today);
+
+  const hasDuration = (dur: string) =>
+    (existing ?? []).some(
+      (c: Record<string, unknown>) =>
+        (c.challenge_definitions as Record<string, unknown> | null)?.duration === dur,
+    );
+
+  const durations: { dur: string; count: number; start: string; end: string }[] = [];
+
+  const todayDate = new Date(today + "T00:00:00Z");
+
+  if (!hasDuration("daily")) {
+    durations.push({ dur: "daily", count: 3, start: today, end: today });
+  }
+  if (!hasDuration("weekly")) {
+    const day = todayDate.getUTCDay();
+    const monday = new Date(todayDate);
+    monday.setUTCDate(monday.getUTCDate() - ((day + 6) % 7));
+    const sunday = new Date(monday);
+    sunday.setUTCDate(sunday.getUTCDate() + 6);
+    durations.push({
+      dur: "weekly",
+      count: 2,
+      start: monday.toISOString().slice(0, 10),
+      end: sunday.toISOString().slice(0, 10),
+    });
+  }
+  if (!hasDuration("monthly")) {
+    const monthStart = today.slice(0, 7) + "-01";
+    const nextMonth = new Date(todayDate.getUTCFullYear(), todayDate.getUTCMonth() + 1, 0);
+    const monthEnd = nextMonth.toISOString().slice(0, 10);
+    durations.push({ dur: "monthly", count: 1, start: monthStart, end: monthEnd });
+  }
+
+  if (durations.length === 0) return;
+
+  const { data: allDefs } = await supabase
+    .from("challenge_definitions")
+    .select("id, duration")
+    .eq("is_active", true);
+
+  if (!allDefs) return;
+
+  const rows: Record<string, unknown>[] = [];
+  for (const { dur, count, start, end } of durations) {
+    const pool = allDefs.filter((d: { duration: string }) => d.duration === dur);
+    const shuffled = pool.sort(() => Math.random() - 0.5);
+    const picked = shuffled.slice(0, count);
+    for (const ch of picked) {
+      rows.push({
+        user_id: userId,
+        challenge_id: ch.id,
+        period_start: start,
+        period_end: end,
+      });
+    }
+  }
+
+  if (rows.length > 0) {
+    await supabase.from("user_challenges").insert(rows);
+  }
+}
+
+// ── Challenge progress ─────────────────────────────────────────────────
+
+const ACTION_TO_CONDITION: Record<string, string[]> = {
+  order_created: ["orders_created", "order_created"],
+  order_cumplida: ["orders_completed", "order_cumplida"],
+  order_assembled: ["orders_assembled", "order_assembled"],
+  client_created: ["clients_created", "client_created"],
+  product_created: ["products_created", "product_created"],
+};
+
+export async function updateChallengeProgress(
+  supabase: SupabaseClient,
+  userId: string,
+  actionType: string,
+  metadata?: Record<string, unknown>,
+): Promise<{ xp_reward: number; name: string | null }[]> {
+  const conditions = ACTION_TO_CONDITION[actionType];
+  if (!conditions) return [];
+
+  const today = new Date().toISOString().slice(0, 10);
+  const { data: active } = await supabase
+    .from("user_challenges")
+    .select("*, challenge_definitions(*)")
+    .eq("user_id", userId)
+    .eq("is_completed", false)
+    .gte("period_end", today);
+
+  if (!active) return [];
+
+  const completed: { xp_reward: number; name: string | null }[] = [];
+
+  for (const uc of active) {
+    const def = uc.challenge_definitions;
+    if (!def) continue;
+    if (!conditions.includes(def.condition_type ?? "")) continue;
+
+    const increment = def.condition_type?.includes("tonnage")
+      ? Number(metadata?.tonnage ?? 1)
+      : 1;
+    const newProgress = (uc.current_progress ?? 0) + increment;
+    const isDone = newProgress >= (def.condition_threshold ?? 1);
+
+    const updates: Record<string, unknown> = {
+      current_progress: newProgress,
+    };
+    if (isDone) {
+      updates.is_completed = true;
+      updates.completed_at = new Date().toISOString();
+      updates.xp_awarded = def.xp_reward ?? 0;
+    }
+
+    await supabase.from("user_challenges").update(updates).eq("id", uc.id);
+
+    if (isDone) {
+      completed.push({ xp_reward: def.xp_reward ?? 0, name: def.name });
+    }
+  }
+
+  return completed;
+}
+
+// ── Mastery path XP ────────────────────────────────────────────────────
+
+const MASTERY_TIER_THRESHOLDS = [0, 500, 2000, 5000, 12000];
+
+const ACTION_TO_MASTERY: Record<string, string> = {
+  order_created: "order_flow",
+  order_cumplida: "order_flow",
+  order_assembled: "order_flow",
+  status_updated: "order_flow",
+  client_created: "client_relations",
+  product_created: "product_specialist",
+  product_updated: "product_specialist",
+};
+
+export async function updateMasteryPathXP(
+  supabase: SupabaseClient,
+  userId: string,
+  actionType: string,
+  xpAmount: number,
+): Promise<void> {
+  const pathKey = ACTION_TO_MASTERY[actionType];
+  if (!pathKey) return;
+
+  const { data: path } = await supabase
+    .from("mastery_paths")
+    .select("id, domain_xp, current_tier")
+    .eq("user_id", userId)
+    .eq("path_key", pathKey)
+    .single();
+
+  if (!path) return;
+
+  const newXP = ((path.domain_xp ?? 0) as number) + xpAmount;
+  let newTier = (path.current_tier ?? 0) as number;
+  for (let i = MASTERY_TIER_THRESHOLDS.length - 1; i >= 0; i--) {
+    if (newXP >= MASTERY_TIER_THRESHOLDS[i]) {
+      newTier = i;
+      break;
+    }
+  }
+
+  const updates: Record<string, unknown> = { domain_xp: newXP };
+  if (newTier > ((path.current_tier ?? 0) as number)) {
+    updates.current_tier = newTier;
+    updates.tier_unlocked_at = new Date().toISOString();
+  }
+
+  await supabase.from("mastery_paths").update(updates).eq("id", path.id);
 }

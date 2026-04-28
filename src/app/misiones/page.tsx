@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { AppIcon } from "@/components/ui/app-icon";
 import { AuthShell } from "@/components/steelflow/AuthShell";
 import { createClient } from "@/lib/supabase/server";
@@ -95,7 +96,8 @@ function getCurrentLevelXP(currentLevel: number): number {
 export default async function MisionesPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  const userId = user?.id ?? "";
+  if (!user) redirect("/login");
+  const userId = user.id;
 
   const [profileRes, levelDefsRes, activeQuestsRes, onboardingQuestsRes, completedQuestsRes] =
     await Promise.all([
