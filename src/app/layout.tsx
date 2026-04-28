@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import { GamificationProvider } from "@/components/steelflow/GamificationProvider";
 
 const inter = Inter({
   variable: "--font-steelflow-inter",
@@ -21,7 +22,7 @@ export default function RootLayout({
   return (
     <html lang="es" className="dark">
       <body className={`${inter.variable} font-display antialiased min-h-screen bg-background-light text-slate-900 dark:bg-background-dark dark:text-slate-100`}>
-        {children}
+        <GamificationProvider>{children}</GamificationProvider>
       </body>
     </html>
   );

@@ -1,5 +1,7 @@
 import { AppIcon } from "@/components/ui/app-icon";
 import { SteelFlowShell } from "@/components/steelflow/SteelFlowShell";
+import { SteelRings } from "@/components/steelflow/SteelRings";
+import { ChallengesCard } from "@/components/steelflow/ChallengesCard";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function SteelFlowProDashboardPage() {
@@ -139,12 +141,13 @@ export default async function SteelFlowProDashboardPage() {
           </div>
 
           {/* KPI Cards */}
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
             {[
               { label: "Orders", value: totalOrders, icon: "receipt_long" },
               { label: "Clients", value: totalClients, icon: "groups" },
               { label: "Products", value: totalProducts, icon: "inventory_2" },
               { label: "Total (T)", value: `${totalWeight.toFixed(1)}`, icon: "scale" },
+              { label: "Racha", value: "7 dias", icon: "local_fire_department" },
             ].map((kpi) => (
               <div
                 key={kpi.label}
@@ -335,6 +338,11 @@ export default async function SteelFlowProDashboardPage() {
 
         {/* Right Column: Sidebar */}
         <aside className="flex flex-col gap-6 lg:col-span-4">
+          {/* Steel Rings Widget */}
+          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <SteelRings flowCount={3} flowTarget={5} tonnageValue={28.5} tonnageTarget={50} reachCount={2} reachTarget={3} streakDays={7} />
+          </div>
+
           {/* Pallet Calculator Card */}
           <div className="relative overflow-hidden rounded-xl bg-primary p-6 text-white shadow-lg">
             <div className="absolute -right-10 -bottom-10 opacity-10">
@@ -456,6 +464,9 @@ export default async function SteelFlowProDashboardPage() {
               )}
             </div>
           </div>
+
+          {/* Challenges Card */}
+          <ChallengesCard challenges={[]} />
 
           {/* Industrial Support Info */}
           <div className="flex items-center gap-3 rounded-xl border border-dashed border-slate-300 p-4 dark:border-slate-700">

@@ -206,6 +206,8 @@ export function ProductsWorkspace({
     }
 
     setProducts((current) => [newProduct, ...current]);
+    // Gamification: award XP for product creation
+    // awardXP(supabase, userId, 'product_created', 30, 'product', newProduct.id)
     setSelectedProductId(newProduct.id);
     setForm(createFormState(clients, newProduct));
     setQuery("");
@@ -251,6 +253,8 @@ export function ProductsWorkspace({
     const updatedProduct = error
       ? { ...selectedProduct, ...payload, updated_at: new Date().toISOString() }
       : (data as ProductRecord);
+    // Gamification: award XP for product update
+    // awardXP(supabase, userId, 'product_updated', 20, 'product', updatedProduct.id)
 
     setProducts((current) =>
       current.map((product) =>
@@ -335,6 +339,10 @@ export function ProductsWorkspace({
           <p className="mt-3 text-4xl font-black text-slate-900 dark:text-white">
             {linkedOrders}
           </p>
+        </div>
+        <div className="steelflow-card-hover steelflow-card-hover--br rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+          <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">Mastery</p>
+          <p className="mt-3 text-sm font-bold text-primary">Product Specialist — Tier 1</p>
         </div>
       </section>
 

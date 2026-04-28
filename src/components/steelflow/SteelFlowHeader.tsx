@@ -82,6 +82,11 @@ export function SteelFlowHeader({ searchPlaceholder = "Buscar..." }: { searchPla
           >
             <AppIcon className="text-xl" name="settings" />
           </button>
+          <div className="hidden items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 sm:flex">
+            <span className="material-symbols-outlined text-xs text-primary">local_fire_department</span>
+            <span className="text-[11px] font-bold text-primary">7</span>
+            <span className="text-[10px] text-slate-400">Lv.3</span>
+          </div>
           <div className="relative" ref={userMenuRef}>
             <button
               className="flex size-8 items-center justify-center overflow-hidden rounded-full border border-primary/30 bg-primary/20"

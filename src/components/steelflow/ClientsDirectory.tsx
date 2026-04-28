@@ -128,6 +128,8 @@ export function ClientsDirectory({
     } else {
       setClients((current) => [data as ClientRecord, ...current]);
     }
+    // Gamification: award XP for client creation
+    // awardXP(supabase, userId, 'client_created', 30, 'client', data.id)
 
     setQuery("");
     handleCloseCreate();
@@ -149,7 +151,7 @@ export function ClientsDirectory({
           </p>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
           <div className="rounded-2xl bg-slate-50 px-4 py-3 dark:bg-slate-900">
             <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
               Total clients
@@ -181,6 +183,10 @@ export function ClientsDirectory({
             <p className="mt-1 text-2xl font-black text-slate-900 dark:text-white">
               {totalOrders}
             </p>
+          </div>
+          <div className="rounded-2xl bg-slate-50 px-4 py-3 dark:bg-slate-900">
+            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Mastery</p>
+            <p className="mt-1 text-sm font-bold text-primary">Client Relations — Tier 2</p>
           </div>
         </div>
       </section>

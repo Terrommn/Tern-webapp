@@ -232,6 +232,8 @@ export function OrdersWorkspace({
     }
 
     setOrders((current) => [...newOrders, ...current]);
+    // Gamification: award XP for order creation
+    // awardXP(supabase, userId, 'order_created', 25, 'order', newOrder.id)
     setSelectedOrderKey(orderKey(newOrders[0]));
     setQuery("");
     handleCloseCreate();
@@ -257,6 +259,13 @@ export function OrdersWorkspace({
               weight, status, plant, and pallet information from the live
               database.
             </p>
+            <div className="mt-2 flex items-center gap-2">
+              <span className="material-symbols-outlined text-sm text-primary">emoji_events</span>
+              <span className="text-xs font-semibold text-primary">Order Flow Commander — Tier 3/5</span>
+              <div className="h-1.5 w-20 rounded-full bg-slate-200 dark:bg-slate-800">
+                <div className="h-full w-3/5 rounded-full bg-primary" />
+              </div>
+            </div>
           </div>
           <div className="flex flex-wrap gap-3">
             <button
