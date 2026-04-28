@@ -159,7 +159,9 @@ export function ProductsWorkspace({
   async function handleCreateProduct(event: React.FormEvent) {
     event.preventDefault();
 
+    const productId = `${createForm.gauge}_${createForm.client_id}`.replace(/\s+/g, "_");
     const payload = {
+      id: productId,
       gauge: createForm.gauge,
       thickness: Number(createForm.thickness),
       client_id: createForm.client_id,
@@ -188,7 +190,6 @@ export function ProductsWorkspace({
       console.error("Failed to create product:", error);
       const now = new Date().toISOString();
       newProduct = {
-        id: crypto.randomUUID(),
         ...payload,
         oiling: null,
         flatness: null,

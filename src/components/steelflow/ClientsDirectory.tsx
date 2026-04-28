@@ -104,8 +104,10 @@ export function ClientsDirectory({
   async function handleCreateClient(event: React.FormEvent) {
     event.preventDefault();
 
+    const clientName = form.name.trim();
     const payload = {
-      name: form.name.trim(),
+      id: clientName,
+      name: clientName,
       transport_type: form.transport_type.trim() || null,
     };
 
@@ -120,9 +122,7 @@ export function ClientsDirectory({
       console.error("Failed to create client:", error);
       const now = new Date().toISOString();
       const fallback: ClientRecord = {
-        id: form.name.trim(),
         ...payload,
-        transport_type: payload.transport_type,
         created_at: now,
         updated_at: now,
       };
