@@ -8,9 +8,10 @@ import { mapHandFrameToIntent } from "@/lib/hand-camera-mapper";
 
 const RANGE_AZIMUTH = Math.PI;
 const RANGE_POLAR = Math.PI / 2;
-const ZOOM_RANGE = 0.8;
+const ZOOM_LINEAR_RANGE = 20;
 const ZOOM_DEAD_ZONE = 0.04;
 const ZOOM_DAMPING = 0.18;
+const MODE_HOLD_MS = 200;
 const DOLLY_EPSILON = 0.001;
 
 type TrackingMode = "orbit" | "zoom" | null;
@@ -30,6 +31,7 @@ export default function HandCameraDriver({
 }: Props) {
   const controls = useThree((s) => s.controls) as OrbitControlsImpl | null;
   const modeRef = useRef<TrackingMode>(null);
+  const lastNonIdleAtRef = useRef(0);
 
   const baseAzRef = useRef(0);
   const basePolarRef = useRef(0);
@@ -42,14 +44,17 @@ export default function HandCameraDriver({
   useFrame(() => {
     if (!controls) return;
     const intent = mapHandFrameToIntent(frameRef.current);
+    const now = performance.now();
 
     if (intent.mode === "idle") {
       if (modeRef.current !== null) {
+        if (now - lastNonIdleAtRef.current < MODE_HOLD_MS) return;
         modeRef.current = null;
         onRelease?.();
       }
       return;
     }
+    lastNonIdleAtRef.current = now;
 
     if (intent.mode !== modeRef.current) {
       modeRef.current = intent.mode;
@@ -82,13 +87,13 @@ export default function HandCameraDriver({
       return;
     }
 
-    // zoom
+    // zoom (linear, symmetric)
     const rawDy = intent.palmY - zoomAnchorYRef.current;
     const absDy = Math.abs(rawDy);
     if (absDy < ZOOM_DEAD_ZONE) return;
     const dy = rawDy - Math.sign(rawDy) * ZOOM_DEAD_ZONE;
     const target =
-      baseDistanceRef.current * Math.exp(-dy * ZOOM_RANGE * sensitivity);
+      baseDistanceRef.current + -dy * ZOOM_LINEAR_RANGE * sensitivity;
     const clamped = Math.max(
       controls.minDistance,
       Math.min(controls.maxDistance, target),
