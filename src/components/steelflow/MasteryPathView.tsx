@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { AppIcon } from "@/components/ui/app-icon";
 import type { MasteryPath } from "@/types/gamification";
 
 type MasteryPathViewProps = {
@@ -51,12 +52,11 @@ function PathColumn({
     <div className="flex flex-col items-center gap-1">
       {/* Path header */}
       <div className="mb-2 text-center">
-        <span
-          className="material-symbols-outlined text-2xl"
+        <AppIcon
+          className="text-2xl"
+          name={meta.icon}
           style={{ color: meta.color }}
-        >
-          {meta.icon}
-        </span>
+        />
         <p className="mt-1 text-[11px] font-bold text-slate-900 dark:text-white">
           {meta.label}
         </p>
@@ -98,9 +98,7 @@ function PathColumn({
                 title={TIER_LABELS[tierIdx]}
               >
                 {isCompleted ? (
-                  <span className="material-symbols-outlined text-base text-white">
-                    check
-                  </span>
+                  <AppIcon className="text-base text-white" name="check" />
                 ) : isCurrent ? (
                   <span
                     className="text-xs font-bold"
@@ -109,9 +107,7 @@ function PathColumn({
                     {tierIdx + 1}
                   </span>
                 ) : (
-                  <span className="material-symbols-outlined text-base text-slate-400 dark:text-slate-600">
-                    lock
-                  </span>
+                  <AppIcon className="text-base text-slate-400 dark:text-slate-600" name="lock" />
                 )}
 
                 {/* Current tier ring animation */}

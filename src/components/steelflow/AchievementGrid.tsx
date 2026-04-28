@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { AppIcon } from "@/components/ui/app-icon";
 import type {
   AchievementCategory,
   AchievementDefinition,
@@ -81,20 +82,15 @@ function BadgeCard({
         }
       >
         {isHidden ? (
-          <span className="material-symbols-outlined text-lg text-slate-400">
-            help
-          </span>
+          <AppIcon className="text-lg text-slate-400" name="help" />
         ) : unlocked ? (
-          <span
-            className="material-symbols-outlined text-lg"
+          <AppIcon
+            className="text-lg"
             style={{ color: tierColor }}
-          >
-            {achievement.icon_name ?? "emoji_events"}
-          </span>
+            name={achievement.icon_name ?? "emoji_events"}
+          />
         ) : (
-          <span className="material-symbols-outlined text-lg text-slate-400 dark:text-slate-600">
-            lock
-          </span>
+          <AppIcon className="text-lg text-slate-400 dark:text-slate-600" name="lock" />
         )}
       </div>
 

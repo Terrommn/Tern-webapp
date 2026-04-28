@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { AppIcon } from "@/components/ui/app-icon";
 import type { XPToastItem } from "@/types/gamification";
 
 type XPToastProps = {
@@ -56,9 +57,7 @@ function SingleToast({
       role="status"
       aria-live="polite"
     >
-      <span className="material-symbols-outlined text-lg text-primary">
-        bolt
-      </span>
+      <AppIcon className="text-lg text-primary" name="bolt" />
       <div className="min-w-0">
         <p className="text-sm font-semibold text-white">
           {toast.xpAmount > 0 && (

@@ -1,5 +1,7 @@
 "use client";
 
+import { AppIcon } from "@/components/ui/app-icon";
+
 type SteelRingsProps = {
   flowCount: number;
   flowTarget: number;
@@ -164,9 +166,7 @@ export function SteelRings({
 
       {/* Streak indicator */}
       <div className="flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 dark:bg-slate-800">
-        <span className="material-symbols-outlined text-base text-amber-500">
-          local_fire_department
-        </span>
+        <AppIcon className="text-base text-amber-500" name="local_fire_department" />
         <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
           {streakDays} {streakDays === 1 ? "dia" : "dias"}
         </span>

@@ -469,9 +469,7 @@ function EmptyScene() {
       <Html center position={[0, 1.5, 0]}>
         <div className="flex flex-col items-center gap-2 select-none">
           <div className="rounded-full bg-slate-800/80 p-4">
-            <span className="material-symbols-rounded text-4xl text-slate-500">
-              inventory_2
-            </span>
+            <AppIcon className="text-4xl text-slate-500" name="inventory_2" />
           </div>
           <p className="text-sm font-medium text-slate-500">
             Seleccione una orden para visualizar tarimas

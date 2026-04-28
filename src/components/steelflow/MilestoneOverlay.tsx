@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { AppIcon } from "@/components/ui/app-icon";
 
 type MilestoneOverlayProps = {
   visible: boolean;
@@ -87,9 +88,7 @@ export function MilestoneOverlay({
 
         {/* Icon */}
         <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-          <span className="material-symbols-outlined text-3xl text-primary">
-            {icon}
-          </span>
+          <AppIcon className="text-3xl text-primary" name={icon} />
         </div>
 
         {/* Title */}
@@ -105,9 +104,7 @@ export function MilestoneOverlay({
         {/* XP earned */}
         {xp > 0 && (
           <div className="flex items-center gap-1.5 rounded-full bg-primary/10 px-4 py-1.5">
-            <span className="material-symbols-outlined text-base text-primary">
-              bolt
-            </span>
+            <AppIcon className="text-base text-primary" name="bolt" />
             <span className="text-sm font-bold text-primary">+{xp} XP</span>
           </div>
         )}

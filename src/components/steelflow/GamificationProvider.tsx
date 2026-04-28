@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import type { ReactNode } from "react";
@@ -25,6 +26,7 @@ import type {
   UserQuest,
   XPToastItem,
 } from "@/types/gamification";
+import { QuestProgressPill } from "./QuestProgressPill";
 import { XPToast } from "./XPToast";
 
 // ── Context shape ───────────────────────────────────────────────────────
@@ -178,7 +180,10 @@ export function GamificationProvider({ children }: { children: ReactNode }) {
     [supabase, pushToast, refreshProfile],
   );
 
+  const fetchedRef = useRef(false);
   useEffect(() => {
+    if (fetchedRef.current) return;
+    fetchedRef.current = true;
     fetchAll();
   }, [fetchAll]);
 
@@ -206,6 +211,11 @@ export function GamificationProvider({ children }: { children: ReactNode }) {
   return (
     <GamificationContext.Provider value={value}>
       {children}
+      <QuestProgressPill
+        completedCount={quests.filter((q) => q.status === "completed").length}
+        totalCount={quests.length}
+        visible={quests.length > 0}
+      />
       <XPToast toasts={toasts} onDismiss={dismissToast} />
     </GamificationContext.Provider>
   );

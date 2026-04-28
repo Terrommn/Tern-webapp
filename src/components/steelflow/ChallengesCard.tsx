@@ -1,5 +1,6 @@
 "use client";
 
+import { AppIcon } from "@/components/ui/app-icon";
 import type { ChallengeDefinition, UserChallenge } from "@/types/gamification";
 
 type ChallengesCardProps = {
@@ -21,9 +22,7 @@ export function ChallengesCard({ challenges }: ChallengesCardProps) {
   return (
     <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-950">
       <div className="mb-4 flex items-center gap-2">
-        <span className="material-symbols-outlined text-lg text-primary">
-          target
-        </span>
+        <AppIcon className="text-lg text-primary" name="target" />
         <h3 className="text-sm font-bold text-slate-900 dark:text-white">
           Desafios del Dia
         </h3>

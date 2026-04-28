@@ -1,5 +1,7 @@
 "use client";
 
+import { AppIcon } from "@/components/ui/app-icon";
+
 type ProgressCardProps = {
   level: number;
   titleEs: string;
@@ -28,9 +30,7 @@ export function ProgressCard({
           {level}
         </div>
         <div className="flex items-center gap-0.5">
-          <span className="material-symbols-outlined text-sm text-amber-500">
-            local_fire_department
-          </span>
+          <AppIcon className="text-sm text-amber-500" name="local_fire_department" />
           <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400">
             {streakDays}
           </span>
@@ -55,9 +55,7 @@ export function ProgressCard({
               {titleEs}
             </p>
             <div className="ml-2 flex shrink-0 items-center gap-1">
-              <span className="material-symbols-outlined text-sm text-amber-500">
-                local_fire_department
-              </span>
+              <AppIcon className="text-sm text-amber-500" name="local_fire_department" />
               <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400">
                 {streakDays}d
               </span>
