@@ -253,12 +253,11 @@ export function OrdersWorkspace({
               Orders
             </p>
             <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white md:text-4xl">
-              Order management linked to your Supabase data
+              Order management
             </h1>
             <p className="max-w-3xl text-sm leading-6 text-slate-500 dark:text-slate-400">
               Each order links to a client and one or more products, showing net
-              weight, status, plant, and pallet information from the live
-              database.
+              weight, status, plant, and pallet information.
             </p>
           </div>
           <div className="flex flex-wrap gap-3">

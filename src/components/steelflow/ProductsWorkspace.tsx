@@ -284,7 +284,7 @@ export function ProductsWorkspace({
             </h1>
             <p className="max-w-3xl text-sm leading-6 text-slate-500 dark:text-slate-400">
               Products store gauge, thickness, weight constraints, dimensions,
-              and packaging details from the live Supabase database.
+              and packaging details.
             </p>
           </div>
 

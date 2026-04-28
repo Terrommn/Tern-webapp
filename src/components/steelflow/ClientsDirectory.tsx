@@ -144,11 +144,10 @@ export function ClientsDirectory({
             Clients
           </p>
           <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white">
-            Client directory with transport and order data
+            Client directory
           </h1>
           <p className="max-w-2xl text-sm text-slate-500 dark:text-slate-400">
-            Clients linked to their orders and transport type from the live
-            Supabase database.
+            Clients linked to their orders and transport type.
           </p>
         </div>
 
