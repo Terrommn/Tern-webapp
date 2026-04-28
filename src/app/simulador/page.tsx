@@ -1,6 +1,7 @@
 import { AuthShell } from "@/components/steelflow/AuthShell";
 import { UnitySimulator } from "@/components/steelflow/UnitySimulator";
 import { createClient } from "@/lib/supabase/server";
+import { cookies } from "next/headers";
 import type { OrderRecord } from "@/types/order";
 import type { ProductRecord } from "@/types/product";
 
@@ -18,8 +19,11 @@ export default async function SimuladorPage({
   const initialOrderId = params.order ? Number(params.order) : undefined;
 
   const supabase = await createClient();
+  const cookieStore = await cookies();
+  const role = (cookieStore.get("sf-role")?.value ?? null) as "admin" | "operator" | null;
+
   const [{ data: ordersData }, { data: productsData }] = await Promise.all([
-    supabase.from("orders").select("*"),
+    supabase.from("orders").select("*").order("created_at", { ascending: false }).limit(500),
     supabase.from("products").select("*"),
   ]);
 
@@ -38,6 +42,7 @@ export default async function SimuladorPage({
           orders={(ordersData ?? []) as OrderRecord[]}
           products={(productsData ?? []) as ProductRecord[]}
           initialOrderId={initialOrderId}
+          role={role}
         />
       </main>
     </AuthShell>

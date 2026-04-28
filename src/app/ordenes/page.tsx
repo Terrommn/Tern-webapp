@@ -1,6 +1,7 @@
 import { OrdersWorkspace } from "@/components/steelflow/OrdersWorkspace";
 import { AuthShell } from "@/components/steelflow/AuthShell";
 import { createClient } from "@/lib/supabase/server";
+import { cookies } from "next/headers";
 import type { ClientRecord } from "@/types/client";
 import type { OrderRecord } from "@/types/order";
 import type { ProductRecord } from "@/types/product";
@@ -12,9 +13,11 @@ export const metadata = {
 
 export default async function OrdenesPage() {
   const supabase = await createClient();
+  const cookieStore = await cookies();
+  const role = (cookieStore.get("sf-role")?.value ?? null) as "admin" | "operator" | null;
 
   const [ordersRes, clientsRes, productsRes] = await Promise.all([
-    supabase.from("orders").select("*"),
+    supabase.from("orders").select("*").order("created_at", { ascending: false }).limit(500),
     supabase.from("clients").select("*"),
     supabase.from("products").select("*"),
   ]);
@@ -29,6 +32,7 @@ export default async function OrdenesPage() {
         clients={clients}
         initialOrders={orders}
         products={products}
+        role={role}
       />
     </AuthShell>
   );

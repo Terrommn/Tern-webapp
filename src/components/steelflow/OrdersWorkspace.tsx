@@ -36,6 +36,20 @@ function formatDate(value: string | null) {
   }).format(new Date(value));
 }
 
+function statusLabel(status: string) {
+  if (status === "ARM") return "Armada";
+  if (status === "CUM") return "CUM";
+  if (status === "PEN") return "PEN";
+  return status;
+}
+
+function statusBadgeClass(status: string) {
+  if (status === "CUM") return "bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400";
+  if (status === "ARM") return "bg-amber-500/10 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400";
+  if (status === "PEN") return "bg-primary/10 text-primary";
+  return "bg-slate-500/10 text-slate-600 dark:text-slate-400";
+}
+
 function orderKey(order: OrderRecord) {
   return `${order.id}-${order.line_number}`;
 }
@@ -65,16 +79,21 @@ function createOrderFormState(
   };
 }
 
+type AppRole = "admin" | "operator" | null;
+
 export function OrdersWorkspace({
   initialOrders,
   clients,
   products,
+  role,
 }: {
   initialOrders: OrderRecord[];
   clients: ClientRecord[];
   products: ProductRecord[];
+  role?: AppRole;
 }) {
   const { awardXP } = useGamificationContext();
+  const isOperator = role === "operator";
   const [orders, setOrders] = useState(initialOrders);
   const [query, setQuery] = useState("");
   const [selectedOrderKey, setSelectedOrderKey] = useState(
@@ -136,6 +155,14 @@ export function OrdersWorkspace({
   function handleCloseCreate() {
     setIsCreateOpen(false);
     setForm(createOrderFormState(clients, products));
+  }
+
+  async function handleMarkCUM(order: OrderRecord) {
+    if (order.status !== "ARM") return;
+    const supabase = createSupabaseClient();
+    await supabase.from("orders").update({ status: "CUM", updated_at: new Date().toISOString() }).eq("id", order.id).eq("line_number", order.line_number);
+    setOrders((prev) => prev.map((o) => o.id === order.id && o.line_number === order.line_number ? { ...o, status: "CUM" } : o));
+    await awardXP("order_cumplida", "order", String(order.id), "Orden completada correctamente");
   }
 
   function handleClientChange(client_id: string) {
@@ -260,15 +287,17 @@ export function OrdersWorkspace({
               weight, status, plant, and pallet information.
             </p>
           </div>
-          <div className="flex flex-wrap gap-3">
-            <button
-              className="rounded-2xl bg-primary px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary/90"
-              type="button"
-              onClick={handleOpenCreate}
-            >
-              Create order
-            </button>
-          </div>
+          {!isOperator && (
+            <div className="flex flex-wrap gap-3">
+              <button
+                className="rounded-2xl bg-primary px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary/90"
+                type="button"
+                onClick={handleOpenCreate}
+              >
+                Create order
+              </button>
+            </div>
+          )}
         </div>
       </section>
 
@@ -366,16 +395,8 @@ export function OrdersWorkspace({
                           <AppIcon className="text-sm" name="view_in_ar" />
                           <span className="hidden sm:inline">3D</span>
                         </Link>
-                        <span
-                          className={`rounded-full px-3 py-1 text-[11px] font-semibold ${
-                            order.status === "CUM"
-                              ? "bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400"
-                              : order.status === "PEN"
-                                ? "bg-primary/10 text-primary"
-                                : "bg-orange-500/10 text-orange-600 dark:bg-orange-500/15 dark:text-orange-400"
-                          }`}
-                        >
-                          {order.status}
+                        <span className={`rounded-full px-3 py-1 text-[11px] font-semibold ${statusBadgeClass(order.status)}`}>
+                          {statusLabel(order.status)}
                         </span>
                       </div>
                     </div>
@@ -434,6 +455,31 @@ export function OrdersWorkspace({
                 <AppIcon className="text-lg" name="view_in_ar" />
                 Ver en Simulador 3D
               </Link>
+
+              {isOperator && selectedOrder.status === "ARM" && (
+                <button
+                  type="button"
+                  onClick={() => handleMarkCUM(selectedOrder)}
+                  className="flex items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-emerald-500"
+                >
+                  <AppIcon className="text-lg" name="verified" />
+                  Marcar como CUM (+75 XP)
+                </button>
+              )}
+
+              {isOperator && selectedOrder.status === "CUM" && (
+                <div className="flex items-center justify-center gap-2 rounded-2xl bg-emerald-500/10 px-5 py-3 text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                  <AppIcon className="text-lg" name="check_circle" />
+                  Orden completada
+                </div>
+              )}
+
+              {isOperator && selectedOrder.status === "PEN" && (
+                <div className="flex items-center justify-center gap-2 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-5 py-3 text-sm font-semibold text-amber-600 dark:text-amber-400">
+                  <AppIcon className="text-lg" name="info" />
+                  Visualiza en Simulador para armar
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900">

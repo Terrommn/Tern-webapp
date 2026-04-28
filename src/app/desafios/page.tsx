@@ -7,7 +7,7 @@ export const metadata = {
   description: "Desafios diarios, semanales y mensuales para ganar XP.",
 };
 
-const DEMO_USER_ID = "00000000-0000-0000-0000-000000000001";
+
 
 const TIER_COLORS: Record<string, { bg: string; text: string; badge: string }> = {
   bronze: { bg: "bg-[#cd7f32]/10", text: "text-[#cd7f32]", badge: "#cd7f32" },
@@ -40,6 +40,8 @@ function formatToday(): string {
 
 export default async function DesafiosPage() {
   const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const userId = user?.id ?? "";
 
   const today = new Date().toISOString().slice(0, 10);
 
@@ -47,28 +49,28 @@ export default async function DesafiosPage() {
     supabase
       .from("user_challenges")
       .select("*, challenge_definitions(*)")
-      .eq("user_id", DEMO_USER_ID)
+      .eq("user_id", userId)
       .eq("is_completed", false)
       .gte("period_end", today)
       .order("period_end", { ascending: true }),
     supabase
       .from("user_challenges")
       .select("*, challenge_definitions(*)")
-      .eq("user_id", DEMO_USER_ID)
+      .eq("user_id", userId)
       .eq("is_completed", false)
       .gte("period_end", today)
       .order("period_end", { ascending: true }),
     supabase
       .from("user_challenges")
       .select("*, challenge_definitions(*)")
-      .eq("user_id", DEMO_USER_ID)
+      .eq("user_id", userId)
       .eq("is_completed", false)
       .gte("period_end", today)
       .order("period_end", { ascending: true }),
     supabase
       .from("user_challenges")
       .select("*, challenge_definitions(*)")
-      .eq("user_id", DEMO_USER_ID)
+      .eq("user_id", userId)
       .eq("is_completed", true)
       .order("completed_at", { ascending: false })
       .limit(20),

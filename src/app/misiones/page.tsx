@@ -7,7 +7,7 @@ export const metadata = {
   description: "Diario de misiones y narrativa del operador.",
 };
 
-const DEMO_USER_ID = "00000000-0000-0000-0000-000000000001";
+
 
 const LEVEL_THRESHOLDS = [
   { level: 1, xp: 0 },
@@ -107,13 +107,15 @@ function getCurrentLevelXP(currentLevel: number): number {
 
 export default async function MisionesPage() {
   const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const userId = user?.id ?? "";
 
   const [profileRes, levelDefsRes, activeQuestsRes, onboardingQuestsRes, completedQuestsRes] =
     await Promise.all([
       supabase
         .from("user_profiles")
         .select("*")
-        .eq("id", DEMO_USER_ID)
+        .eq("id", userId)
         .maybeSingle(),
       supabase
         .from("level_definitions")
@@ -122,18 +124,18 @@ export default async function MisionesPage() {
       supabase
         .from("user_quests")
         .select("*, quest_definitions(*)")
-        .eq("user_id", DEMO_USER_ID)
+        .eq("user_id", userId)
         .eq("status", "active"),
       supabase
         .from("user_quests")
         .select("*, quest_definitions(*)")
-        .eq("user_id", DEMO_USER_ID)
+        .eq("user_id", userId)
         .like("quest_id", "onb_%")
         .order("quest_id", { ascending: true }),
       supabase
         .from("user_quests")
         .select("*, quest_definitions(*)")
-        .eq("user_id", DEMO_USER_ID)
+        .eq("user_id", userId)
         .eq("status", "completed")
         .order("completed_at", { ascending: false })
         .limit(20),

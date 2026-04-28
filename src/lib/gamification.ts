@@ -5,6 +5,8 @@ import type { DailyActivity, UserProfile } from "@/types/gamification";
 
 export const XP_VALUES: Record<string, number> = {
   order_created: 25,
+  order_assembled: 50,
+  order_cumplida: 75,
   order_completed: 40,
   status_updated: 15,
   client_created: 30,

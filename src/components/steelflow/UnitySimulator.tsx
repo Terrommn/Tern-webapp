@@ -7,6 +7,8 @@ import { OrbitControls, Html } from "@react-three/drei";
 import * as THREE from "three";
 import type { OrderRecord } from "@/types/order";
 import type { ProductRecord } from "@/types/product";
+import { createClient } from "@/lib/supabase/client";
+import { useGamificationContext } from "@/components/steelflow/GamificationProvider";
 import {
   createUnityPalletPayloadFromLayout,
   type UnityPalletPayload,
@@ -673,12 +675,16 @@ export function UnitySimulator({
   orders = [],
   products = [],
   initialOrderId,
+  role,
 }: {
   orders?: OrderRecord[];
   products?: ProductRecord[];
   initialOrderId?: number;
+  role?: "admin" | "operator" | null;
 }) {
+  const { awardXP } = useGamificationContext();
   const [loading, setLoading] = useState(true);
+  const [localOrders, setLocalOrders] = useState(orders);
   const [selectedOrderId, setSelectedOrderId] = useState<number | "">(
     initialOrderId && orders.some((o) => o.id === initialOrderId)
       ? initialOrderId
@@ -698,14 +704,32 @@ export function UnitySimulator({
   );
 
   const selectedOrder = useMemo(
-    () => orders.find((o) => o.id === selectedOrderId),
-    [orders, selectedOrderId],
+    () => localOrders.find((o) => o.id === selectedOrderId),
+    [localOrders, selectedOrderId],
   );
 
   const matchedProduct = useMemo(
     () => (selectedOrder ? productMap.get(selectedOrder.product_id) : undefined),
     [selectedOrder, productMap],
   );
+
+  async function handleMarkArmed() {
+    if (!selectedOrder || selectedOrder.status !== "PEN") return;
+    const supabase = createClient();
+    await supabase
+      .from("orders")
+      .update({ status: "ARM", updated_at: new Date().toISOString() })
+      .eq("id", selectedOrder.id)
+      .eq("line_number", selectedOrder.line_number);
+    setLocalOrders((prev) =>
+      prev.map((o) =>
+        o.id === selectedOrder.id && o.line_number === selectedOrder.line_number
+          ? { ...o, status: "ARM" }
+          : o,
+      ),
+    );
+    await awardXP("order_assembled", "order", String(selectedOrder.id), "Tarima armada correctamente");
+  }
 
   const payload = useMemo<UnityPalletPayload | null>(() => {
     if (!matchedProduct || !selectedOrder) return null;
@@ -775,7 +799,7 @@ export function UnitySimulator({
             }}
           >
             <option value="">Seleccione una orden...</option>
-            {orders.map((order) => {
+            {localOrders.map((order) => {
               const prod = productMap.get(order.product_id);
               return (
                 <option key={`${order.id}-${order.line_number}`} value={order.id}>
@@ -811,6 +835,48 @@ export function UnitySimulator({
           </div>
         )}
       </div>
+
+      {/* ── Operator action button ───────────────────────────────────── */}
+      {role === "operator" && selectedOrder && (
+        <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
+          <div className="flex items-center gap-3">
+            <span className={`rounded-full px-3 py-1 text-xs font-bold ${
+              selectedOrder.status === "ARM"
+                ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                : selectedOrder.status === "CUM"
+                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                  : "bg-primary/10 text-primary"
+            }`}>
+              {selectedOrder.status === "ARM" ? "Armada" : selectedOrder.status}
+            </span>
+            <span className="text-sm text-slate-500 dark:text-slate-400">
+              Orden #{selectedOrder.id} · {selectedOrder.net_weight_ton}t
+            </span>
+          </div>
+          {selectedOrder.status === "PEN" && (
+            <button
+              type="button"
+              onClick={handleMarkArmed}
+              className="flex items-center gap-2 rounded-xl bg-amber-500 px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-amber-400"
+            >
+              <AppIcon className="text-lg" name="inventory" />
+              Marcar como Armada (+50 XP)
+            </button>
+          )}
+          {selectedOrder.status === "ARM" && (
+            <div className="flex items-center gap-2 text-sm font-semibold text-amber-600 dark:text-amber-400">
+              <AppIcon className="text-lg" name="check" />
+              Armada — marca como CUM desde Órdenes
+            </div>
+          )}
+          {selectedOrder.status === "CUM" && (
+            <div className="flex items-center gap-2 text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+              <AppIcon className="text-lg" name="verified" />
+              Orden completada
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── No product match warning ─────────────────────────────────── */}
       {selectedOrder && !matchedProduct && (

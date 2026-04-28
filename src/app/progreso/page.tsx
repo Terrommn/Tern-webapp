@@ -8,7 +8,6 @@ export const metadata = {
   description: "Panel de progreso, logros y estadisticas del operador.",
 };
 
-const DEMO_USER_ID = "00000000-0000-0000-0000-000000000001";
 
 const LEVEL_THRESHOLDS = [
   { level: 1, xp: 0 },
@@ -49,6 +48,8 @@ function getCurrentLevelXP(currentLevel: number): number {
 
 export default async function ProgresoPage() {
   const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const userId = user?.id ?? "";
 
   const [
     profileRes,
@@ -62,7 +63,7 @@ export default async function ProgresoPage() {
     supabase
       .from("user_profiles")
       .select("*")
-      .eq("id", DEMO_USER_ID)
+      .eq("id", userId)
       .maybeSingle(),
     supabase
       .from("level_definitions")
@@ -75,21 +76,21 @@ export default async function ProgresoPage() {
     supabase
       .from("user_achievements")
       .select("*")
-      .eq("user_id", DEMO_USER_ID),
+      .eq("user_id", userId),
     supabase
       .from("mastery_paths")
       .select("*")
-      .eq("user_id", DEMO_USER_ID),
+      .eq("user_id", userId),
     supabase
       .from("xp_events")
       .select("*")
-      .eq("user_id", DEMO_USER_ID)
+      .eq("user_id", userId)
       .order("created_at", { ascending: false })
       .limit(200),
     supabase
       .from("user_personal_records")
       .select("*")
-      .eq("user_id", DEMO_USER_ID),
+      .eq("user_id", userId),
   ]);
 
   const profile = profileRes.data;
