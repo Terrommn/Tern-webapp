@@ -2,53 +2,56 @@
 
 import { AppIcon } from "@/components/ui/app-icon";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 
-const NAV_ITEMS = [
-  {
-    href: "/",
-    label: "Dashboard",
-    icon: "space_dashboard",
-  },
-  {
-    href: "/clientes",
-    label: "Clients",
-    icon: "groups",
-  },
-  {
-    href: "/ordenes",
-    label: "Orders",
-    icon: "receipt_long",
-  },
-  {
-    href: "/productos",
-    label: "Products",
-    icon: "inventory_2",
-  },
-  {
-    href: "/simulador",
-    label: "Simulador",
-    icon: "view_in_ar",
-  },
-  {
-    href: "/progreso",
-    label: "Gamificacion",
-    icon: "emoji_events",
-  },
+type AppRole = "admin" | "operator";
+
+const ALL_NAV_ITEMS = [
+  { href: "/", label: "Dashboard", icon: "space_dashboard", roles: ["admin"] as AppRole[] },
+  { href: "/clientes", label: "Clients", icon: "groups", roles: ["admin"] as AppRole[] },
+  { href: "/ordenes", label: "Orders", icon: "receipt_long", roles: ["admin", "operator"] as AppRole[] },
+  { href: "/productos", label: "Products", icon: "inventory_2", roles: ["admin"] as AppRole[] },
+  { href: "/simulador", label: "Simulador", icon: "view_in_ar", roles: ["admin", "operator"] as AppRole[] },
+  { href: "/progreso", label: "Mi Progreso", icon: "emoji_events", roles: ["operator"] as AppRole[] },
+  { href: "/desafios", label: "Desafíos", icon: "local_fire_department", roles: ["operator"] as AppRole[] },
+  { href: "/misiones", label: "Misiones", icon: "military_tech", roles: ["operator"] as AppRole[] },
 ] as const;
 
 function isActivePath(pathname: string, href: string) {
   return pathname === href || (href !== "/" && pathname.startsWith(href));
 }
 
-export function SteelFlowShell({ children }: { children: React.ReactNode }) {
+interface SteelFlowShellProps {
+  children: React.ReactNode;
+  role: AppRole | null;
+}
+
+export function SteelFlowShell({ children, role }: SteelFlowShellProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const navItems = ALL_NAV_ITEMS.filter(
+    (item) => role && item.roles.includes(role)
+  );
 
   const currentSection =
-    NAV_ITEMS.find(({ href }) => isActivePath(pathname, href))?.label ?? "SteelFlow";
+    navItems.find(({ href }) => isActivePath(pathname, href))?.label ?? "SteelFlow";
+
+  async function handleLogout() {
+    setIsLoggingOut(true);
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push("/login");
+    router.refresh();
+  }
+
+  const roleLabel = role === "admin" ? "Administrador" : role === "operator" ? "Operador" : "";
+  const roleBadgeColor = role === "admin" ? "text-[#d41111] bg-[#d41111]/10 ring-[#d41111]/20" : "text-emerald-400 bg-emerald-400/10 ring-emerald-400/20";
 
   return (
     <div className="flex min-h-screen bg-background-light dark:bg-background-dark">
@@ -74,7 +77,7 @@ export function SteelFlowShell({ children }: { children: React.ReactNode }) {
               "flex min-w-0 items-center gap-3 text-primary transition-all",
               isCollapsed ? "md:justify-center" : "",
             ].join(" ")}
-            href="/"
+            href={role === "operator" ? "/ordenes" : "/"}
             onClick={() => setMobileOpen(false)}
           >
             <AppIcon className="text-3xl" name="precision_manufacturing" />
@@ -112,6 +115,14 @@ export function SteelFlowShell({ children }: { children: React.ReactNode }) {
         </div>
 
         <div className="flex flex-1 flex-col px-3 py-4">
+          {/* Role badge */}
+          {role && !isCollapsed && (
+            <div className={`mx-2 mb-4 flex items-center gap-2 rounded-lg px-3 py-1.5 ring-1 ${roleBadgeColor}`}>
+              <AppIcon className="text-base" name={role === "admin" ? "admin_panel_settings" : "engineering"} />
+              <span className="text-xs font-bold">{roleLabel}</span>
+            </div>
+          )}
+
           <div className={isCollapsed ? "md:px-1" : "px-2"}>
             <p
               className={[
@@ -124,7 +135,7 @@ export function SteelFlowShell({ children }: { children: React.ReactNode }) {
           </div>
 
           <nav className="flex flex-col gap-2">
-            {NAV_ITEMS.map(({ href, icon, label }) => {
+            {navItems.map(({ href, icon, label }) => {
               const active = isActivePath(pathname, href);
 
               return (
@@ -148,10 +159,27 @@ export function SteelFlowShell({ children }: { children: React.ReactNode }) {
             })}
           </nav>
 
-          <div className="mt-auto px-2 pt-6">
+          <div className="mt-auto px-2 pt-6 space-y-2">
+            {/* Logout button */}
+            <button
+              type="button"
+              onClick={handleLogout}
+              disabled={isLoggingOut}
+              className={[
+                "w-full flex items-center rounded-xl px-3 py-3 text-sm font-semibold transition-all text-slate-500 hover:bg-red-500/10 hover:text-red-400 dark:text-slate-400 dark:hover:text-red-400",
+                isCollapsed ? "md:justify-center" : "gap-3",
+              ].join(" ")}
+              title="Cerrar sesión"
+            >
+              <AppIcon className="text-[20px]" name="logout" />
+              <span className={isCollapsed ? "md:hidden" : ""}>
+                {isLoggingOut ? "Saliendo..." : "Cerrar sesión"}
+              </span>
+            </button>
+
             <div
               className={[
-                "mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900",
+                "rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900",
                 isCollapsed ? "md:px-2 md:py-3" : "",
               ].join(" ")}
             >

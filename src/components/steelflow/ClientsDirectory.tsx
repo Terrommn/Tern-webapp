@@ -2,6 +2,7 @@
 
 import { AppIcon } from "@/components/ui/app-icon";
 import { useMemo, useState } from "react";
+import { useGamificationContext } from "@/components/steelflow/GamificationProvider";
 import { CreateEntityModal } from "@/components/steelflow/CreateEntityModal";
 import { createClient as createSupabaseClient } from "@/lib/supabase/client";
 import type { ClientRecord } from "@/types/client";
@@ -41,6 +42,7 @@ export function ClientsDirectory({
   const [clients, setClients] = useState(initialClients);
   const [query, setQuery] = useState("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const { awardXP } = useGamificationContext();
   const [form, setForm] = useState<ClientFormState>(createClientFormState());
 
   const orderCountByClient = useMemo(
@@ -128,8 +130,7 @@ export function ClientsDirectory({
     } else {
       setClients((current) => [data as ClientRecord, ...current]);
     }
-    // Gamification: award XP for client creation
-    // awardXP(supabase, userId, 'client_created', 30, 'client', data.id)
+    if (!error && data) awardXP("client_created", "client", data.id);
 
     setQuery("");
     handleCloseCreate();

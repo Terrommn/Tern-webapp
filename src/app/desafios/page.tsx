@@ -1,5 +1,5 @@
 import { AppIcon } from "@/components/ui/app-icon";
-import { SteelFlowShell } from "@/components/steelflow/SteelFlowShell";
+import { AuthShell } from "@/components/steelflow/AuthShell";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata = {
@@ -156,7 +156,7 @@ export default async function DesafiosPage() {
   }
 
   return (
-    <SteelFlowShell>
+    <AuthShell>
       <main className="mx-auto flex w-full max-w-[1440px] flex-1 flex-col gap-8 p-6 lg:p-10">
         {/* Hero Card */}
         <div className="relative overflow-hidden rounded-[28px] border border-slate-200 bg-white p-8 shadow-sm dark:border-slate-800 dark:bg-slate-950">
@@ -409,6 +409,6 @@ export default async function DesafiosPage() {
           </aside>
         </div>
       </main>
-    </SteelFlowShell>
+    </AuthShell>
   );
 }

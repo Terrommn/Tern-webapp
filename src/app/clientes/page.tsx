@@ -1,5 +1,5 @@
 import { ClientsDirectory } from "@/components/steelflow/ClientsDirectory";
-import { SteelFlowShell } from "@/components/steelflow/SteelFlowShell";
+import { AuthShell } from "@/components/steelflow/AuthShell";
 import { createClient } from "@/lib/supabase/server";
 import type { ClientRecord } from "@/types/client";
 import type { OrderRecord } from "@/types/order";
@@ -21,8 +21,8 @@ export default async function ClientesPage() {
   const orders = (ordersRes.data ?? []) as OrderRecord[];
 
   return (
-    <SteelFlowShell>
+    <AuthShell>
       <ClientsDirectory clients={clients} orders={orders} />
-    </SteelFlowShell>
+    </AuthShell>
   );
 }

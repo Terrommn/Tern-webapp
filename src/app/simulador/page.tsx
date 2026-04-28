@@ -1,4 +1,4 @@
-import { SteelFlowShell } from "@/components/steelflow/SteelFlowShell";
+import { AuthShell } from "@/components/steelflow/AuthShell";
 import { UnitySimulator } from "@/components/steelflow/UnitySimulator";
 import { createClient } from "@/lib/supabase/server";
 import type { OrderRecord } from "@/types/order";
@@ -24,7 +24,7 @@ export default async function SimuladorPage({
   ]);
 
   return (
-    <SteelFlowShell>
+    <AuthShell>
       <main className="mx-auto w-full max-w-[1440px] flex-1 p-6 lg:p-10">
         <div className="mb-8 flex flex-col gap-1">
           <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white">
@@ -40,6 +40,6 @@ export default async function SimuladorPage({
           initialOrderId={initialOrderId}
         />
       </main>
-    </SteelFlowShell>
+    </AuthShell>
   );
 }

@@ -1,5 +1,5 @@
 import { ProductsWorkspace } from "@/components/steelflow/ProductsWorkspace";
-import { SteelFlowShell } from "@/components/steelflow/SteelFlowShell";
+import { AuthShell } from "@/components/steelflow/AuthShell";
 import { createClient } from "@/lib/supabase/server";
 import type { ClientRecord } from "@/types/client";
 import type { OrderRecord } from "@/types/order";
@@ -24,12 +24,12 @@ export default async function ProductosPage() {
   const orders = (ordersRes.data ?? []) as OrderRecord[];
 
   return (
-    <SteelFlowShell>
+    <AuthShell>
       <ProductsWorkspace
         initialProducts={products}
         clients={clients}
         orders={orders}
       />
-    </SteelFlowShell>
+    </AuthShell>
   );
 }

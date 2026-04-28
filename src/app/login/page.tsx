@@ -3,6 +3,7 @@
 import { AppIcon } from "@/components/ui/app-icon";
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import {
   Mail,
   Lock,
@@ -95,19 +96,32 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [focusedField, setFocusedField] = useState<string | null>(null);
 
   const handleSubmit = useCallback(
-    (e: React.FormEvent) => {
+    async (e: React.FormEvent) => {
       e.preventDefault();
       setIsLoading(true);
-      // Placeholder — set session cookie then redirect
-      setTimeout(() => {
-        document.cookie = "steelflow-session=active; path=/; max-age=86400";
-        router.push("/");
-      }, 1800);
+      setError(null);
+
+      const supabase = createClient();
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (authError || !data.user) {
+        setError("Correo o contraseña incorrectos.");
+        setIsLoading(false);
+        return;
+      }
+
+      const role = data.user.app_metadata?.role;
+      router.push(role === "operator" ? "/ordenes" : "/");
+      router.refresh();
     },
-    [router]
+    [email, password, router]
   );
 
   return (
@@ -202,6 +216,11 @@ export default function LoginPage() {
 
                 {/* Form */}
                 <form onSubmit={handleSubmit} className="space-y-5">
+                  {error && (
+                    <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+                      {error}
+                    </div>
+                  )}
                   {/* Email */}
                   <div className="space-y-2">
                     <label

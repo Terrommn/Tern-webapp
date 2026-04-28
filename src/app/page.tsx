@@ -1,5 +1,5 @@
 import { AppIcon } from "@/components/ui/app-icon";
-import { SteelFlowShell } from "@/components/steelflow/SteelFlowShell";
+import { AuthShell } from "@/components/steelflow/AuthShell";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function SteelFlowProDashboardPage() {
@@ -124,7 +124,7 @@ export default async function SteelFlowProDashboardPage() {
   const capacityIcons = ["factory", "precision_manufacturing", "package_2"];
 
   return (
-    <SteelFlowShell>
+    <AuthShell>
       <main className="mx-auto w-full max-w-[1440px] flex-1 grid grid-cols-1 gap-8 p-6 lg:grid-cols-12 lg:p-10">
         {/* Left Column: Flow Control & Tables */}
         <div className="flex flex-col gap-8 lg:col-span-8">
@@ -492,6 +492,6 @@ export default async function SteelFlowProDashboardPage() {
           </div>
         </aside>
       </main>
-    </SteelFlowShell>
+    </AuthShell>
   );
 }

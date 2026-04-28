@@ -2,6 +2,7 @@
 
 import { AppIcon } from "@/components/ui/app-icon";
 import { useMemo, useState } from "react";
+import { useGamificationContext } from "@/components/steelflow/GamificationProvider";
 import { CreateEntityModal } from "@/components/steelflow/CreateEntityModal";
 import { createClient as createSupabaseClient } from "@/lib/supabase/client";
 import type { ClientRecord } from "@/types/client";
@@ -68,6 +69,7 @@ export function ProductsWorkspace({
   clients: ClientRecord[];
   orders: OrderRecord[];
 }) {
+  const { awardXP } = useGamificationContext();
   const [products, setProducts] = useState(initialProducts);
   const [query, setQuery] = useState("");
   const [selectedProductId, setSelectedProductId] = useState(
@@ -206,8 +208,7 @@ export function ProductsWorkspace({
     }
 
     setProducts((current) => [newProduct, ...current]);
-    // Gamification: award XP for product creation
-    // awardXP(supabase, userId, 'product_created', 30, 'product', newProduct.id)
+    awardXP("product_created", "product", newProduct.id);
     setSelectedProductId(newProduct.id);
     setForm(createFormState(clients, newProduct));
     setQuery("");
@@ -253,8 +254,7 @@ export function ProductsWorkspace({
     const updatedProduct = error
       ? { ...selectedProduct, ...payload, updated_at: new Date().toISOString() }
       : (data as ProductRecord);
-    // Gamification: award XP for product update
-    // awardXP(supabase, userId, 'product_updated', 20, 'product', updatedProduct.id)
+    if (!error) awardXP("product_updated", "product", updatedProduct.id);
 
     setProducts((current) =>
       current.map((product) =>

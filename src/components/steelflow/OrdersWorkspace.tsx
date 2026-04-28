@@ -2,6 +2,7 @@
 
 import { AppIcon } from "@/components/ui/app-icon";
 import { useMemo, useState } from "react";
+import { useGamificationContext } from "@/components/steelflow/GamificationProvider";
 import Link from "next/link";
 import { CreateEntityModal } from "@/components/steelflow/CreateEntityModal";
 import { createClient as createSupabaseClient } from "@/lib/supabase/client";
@@ -73,6 +74,7 @@ export function OrdersWorkspace({
   clients: ClientRecord[];
   products: ProductRecord[];
 }) {
+  const { awardXP } = useGamificationContext();
   const [orders, setOrders] = useState(initialOrders);
   const [query, setQuery] = useState("");
   const [selectedOrderKey, setSelectedOrderKey] = useState(
@@ -232,8 +234,7 @@ export function OrdersWorkspace({
     }
 
     setOrders((current) => [...newOrders, ...current]);
-    // Gamification: award XP for order creation
-    // awardXP(supabase, userId, 'order_created', 25, 'order', newOrder.id)
+    awardXP("order_created", "order", newOrders[0]?.id?.toString());
     setSelectedOrderKey(orderKey(newOrders[0]));
     setQuery("");
     handleCloseCreate();
