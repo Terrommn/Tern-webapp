@@ -1,7 +1,11 @@
 import { AppIcon } from "@/components/ui/app-icon";
 import { AchievementsSection } from "@/components/steelflow/AchievementsSection";
+import { ActivityHeatmap } from "@/components/steelflow/ActivityHeatmap";
 import { AuthShell } from "@/components/steelflow/AuthShell";
+import { MasteryPathView } from "@/components/steelflow/MasteryPathView";
+import { SteelRings } from "@/components/steelflow/SteelRings";
 import { createClient } from "@/lib/supabase/server";
+import { LEVEL_THRESHOLDS } from "@/lib/gamification";
 
 export const metadata = {
   title: "Mi Progreso | SteelFlow Pro",
@@ -9,47 +13,28 @@ export const metadata = {
 };
 
 
-const LEVEL_THRESHOLDS = [
-  { level: 1, xp: 0 },
-  { level: 2, xp: 200 },
-  { level: 3, xp: 500 },
-  { level: 4, xp: 1000 },
-  { level: 5, xp: 2000 },
-  { level: 6, xp: 3500 },
-  { level: 7, xp: 5500 },
-  { level: 8, xp: 8000 },
-  { level: 9, xp: 12000 },
-  { level: 10, xp: 17000 },
-  { level: 11, xp: 24000 },
-  { level: 12, xp: 33000 },
-];
-
-const PATH_NAMES: Record<string, string> = {
-  order_flow: "Flujo de Ordenes",
-  client_relations: "Relaciones con Clientes",
-  product_specialist: "Especialista de Producto",
-};
-
-const PATH_ICONS: Record<string, string> = {
-  order_flow: "receipt_long",
-  client_relations: "groups",
-  product_specialist: "inventory_2",
-};
-
 function getNextLevelXP(currentLevel: number): number {
-  const next = LEVEL_THRESHOLDS.find((t) => t.level === currentLevel + 1);
-  return next?.xp ?? LEVEL_THRESHOLDS[LEVEL_THRESHOLDS.length - 1].xp;
+  const nextIdx = currentLevel + 1;
+  if (nextIdx >= LEVEL_THRESHOLDS.length) {
+    return LEVEL_THRESHOLDS[LEVEL_THRESHOLDS.length - 1];
+  }
+  return LEVEL_THRESHOLDS[nextIdx];
 }
 
 function getCurrentLevelXP(currentLevel: number): number {
-  const current = LEVEL_THRESHOLDS.find((t) => t.level === currentLevel);
-  return current?.xp ?? 0;
+  if (currentLevel < 0 || currentLevel >= LEVEL_THRESHOLDS.length) return 0;
+  return LEVEL_THRESHOLDS[currentLevel];
 }
 
 export default async function ProgresoPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   const userId = user?.id ?? "";
+
+  const today = new Date().toISOString().slice(0, 10);
+  const oneYearAgo = new Date();
+  oneYearAgo.setDate(oneYearAgo.getDate() - 365);
+  const oneYearAgoStr = oneYearAgo.toISOString().slice(0, 10);
 
   const [
     profileRes,
@@ -59,6 +44,8 @@ export default async function ProgresoPage() {
     masteryRes,
     xpEventsRes,
     personalRecordsRes,
+    dailyActivityRes,
+    heatmapRes,
   ] = await Promise.all([
     supabase
       .from("user_profiles")
@@ -91,7 +78,27 @@ export default async function ProgresoPage() {
       .from("user_personal_records")
       .select("*")
       .eq("user_id", userId),
+    supabase
+      .from("daily_activity")
+      .select("ring_flow_count, ring_flow_target, ring_tonnage_value, ring_tonnage_target, ring_reach_count, ring_reach_target")
+      .eq("user_id", userId)
+      .eq("activity_date", today)
+      .maybeSingle(),
+    supabase
+      .from("daily_activity")
+      .select("activity_date, orders_created, ring_tonnage_value, heatmap_level")
+      .eq("user_id", userId)
+      .gte("activity_date", oneYearAgoStr)
+      .order("activity_date", { ascending: true }),
   ]);
+
+  // Log query errors — these are silently swallowed by the ?? [] fallbacks
+  if (xpEventsRes.error) {
+    console.error("[progreso] xp_events query error:", xpEventsRes.error.message, xpEventsRes.error.code);
+  }
+  if (profileRes.error) {
+    console.error("[progreso] user_profiles query error:", profileRes.error.message, profileRes.error.code);
+  }
 
   const profile = profileRes.data;
   const levelDefs = levelDefsRes.data ?? [];
@@ -100,6 +107,15 @@ export default async function ProgresoPage() {
   const masteryPaths = masteryRes.data ?? [];
   const xpEvents = xpEventsRes.data ?? [];
   const personalRecords = personalRecordsRes.data ?? [];
+  const dailyActivity = dailyActivityRes.data;
+
+  // Transform heatmap data
+  const heatmapData = (heatmapRes.data ?? []).map((row) => ({
+    date: row.activity_date as string,
+    level: (row.heatmap_level ?? 0) as number,
+    orders: (row.orders_created ?? 0) as number,
+    tonnage: Number(row.ring_tonnage_value ?? 0),
+  }));
 
   // Derived data
   const totalXP = profile?.total_xp ?? 0;
@@ -248,6 +264,30 @@ export default async function ProgresoPage() {
           </div>
         </div>
 
+        {/* Steel Rings - Daily Progress */}
+        <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+          <div className="mb-1 flex items-center gap-2">
+            <AppIcon className="text-xl text-primary" name="target" />
+            <h2 className="text-xl font-black tracking-tight text-slate-900 dark:text-white">
+              Anillos del Dia
+            </h2>
+          </div>
+          <p className="mb-5 text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">
+            Progreso diario
+          </p>
+          <div className="mx-auto max-w-xs">
+            <SteelRings
+              flowCount={dailyActivity?.ring_flow_count ?? 0}
+              flowTarget={dailyActivity?.ring_flow_target ?? 5}
+              tonnageValue={Number(dailyActivity?.ring_tonnage_value ?? 0)}
+              tonnageTarget={Number(dailyActivity?.ring_tonnage_target ?? 50)}
+              reachCount={dailyActivity?.ring_reach_count ?? 0}
+              reachTarget={dailyActivity?.ring_reach_target ?? 3}
+              streakDays={currentStreak}
+            />
+          </div>
+        </div>
+
         {/* XP History */}
         <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-950">
           <div className="mb-1 flex items-center gap-2">
@@ -287,6 +327,9 @@ export default async function ProgresoPage() {
           )}
         </div>
 
+        {/* Activity Heatmap */}
+        <ActivityHeatmap data={heatmapData} />
+
         {/* Mastery Paths */}
         <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-950">
           <div className="mb-1 flex items-center gap-2">
@@ -299,67 +342,7 @@ export default async function ProgresoPage() {
             Especializacion profesional
           </p>
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            {(["order_flow", "client_relations", "product_specialist"] as const).map(
-              (pathKey) => {
-                const path = masteryPaths.find((p) => p.path_key === pathKey);
-                const currentTier = path?.current_tier ?? 0;
-                const domainXP = path?.domain_xp ?? 0;
-
-                return (
-                  <div
-                    key={pathKey}
-                    className="rounded-2xl bg-slate-50 p-5 dark:bg-slate-900"
-                  >
-                    <div className="mb-3 flex items-center gap-3">
-                      <div className="flex size-10 items-center justify-center rounded-xl bg-white shadow-sm dark:bg-slate-800">
-                        <AppIcon
-                          className="text-lg text-primary"
-                          name={PATH_ICONS[pathKey]}
-                        />
-                      </div>
-                      <div>
-                        <p className="text-sm font-bold text-slate-900 dark:text-white">
-                          {PATH_NAMES[pathKey]}
-                        </p>
-                        <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">
-                          Tier {currentTier}/5 — {domainXP} XP
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Vertical progress nodes */}
-                    <div className="flex flex-col items-center gap-1 py-2">
-                      {[5, 4, 3, 2, 1].map((tier) => (
-                        <div key={tier} className="flex items-center gap-3">
-                          <span className="w-4 text-right text-[10px] font-bold text-slate-400">
-                            {tier}
-                          </span>
-                          <div
-                            className={[
-                              "size-5 rounded-full border-2 transition-all",
-                              tier <= currentTier
-                                ? "border-primary bg-primary"
-                                : "border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800",
-                            ].join(" ")}
-                          >
-                            {tier <= currentTier && (
-                              <div className="flex size-full items-center justify-center">
-                                <AppIcon className="text-[10px] text-white" name="check" />
-                              </div>
-                            )}
-                          </div>
-                          {tier > 1 && (
-                            <div className="h-3 w-[2px] bg-slate-200 dark:bg-slate-700" />
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              }
-            )}
-          </div>
+          <MasteryPathView paths={masteryPaths} />
         </div>
 
         {/* Achievements Grid (client component) */}

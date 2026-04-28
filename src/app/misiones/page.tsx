@@ -1,28 +1,12 @@
 import { AppIcon } from "@/components/ui/app-icon";
 import { AuthShell } from "@/components/steelflow/AuthShell";
 import { createClient } from "@/lib/supabase/server";
+import { LEVEL_THRESHOLDS } from "@/lib/gamification";
 
 export const metadata = {
   title: "Misiones | SteelFlow Pro",
   description: "Diario de misiones y narrativa del operador.",
 };
-
-
-
-const LEVEL_THRESHOLDS = [
-  { level: 1, xp: 0 },
-  { level: 2, xp: 200 },
-  { level: 3, xp: 500 },
-  { level: 4, xp: 1000 },
-  { level: 5, xp: 2000 },
-  { level: 6, xp: 3500 },
-  { level: 7, xp: 5500 },
-  { level: 8, xp: 8000 },
-  { level: 9, xp: 12000 },
-  { level: 10, xp: 17000 },
-  { level: 11, xp: 24000 },
-  { level: 12, xp: 33000 },
-];
 
 const RANK_NARRATIVES = [
   {
@@ -96,13 +80,16 @@ const QUEST_TYPE_LABELS: Record<string, string> = {
 const QUEST_TYPE_ORDER = ["weekly", "monthly", "seasonal"];
 
 function getNextLevelXP(currentLevel: number): number {
-  const next = LEVEL_THRESHOLDS.find((t) => t.level === currentLevel + 1);
-  return next?.xp ?? LEVEL_THRESHOLDS[LEVEL_THRESHOLDS.length - 1].xp;
+  const nextIdx = currentLevel + 1;
+  if (nextIdx >= LEVEL_THRESHOLDS.length) {
+    return LEVEL_THRESHOLDS[LEVEL_THRESHOLDS.length - 1];
+  }
+  return LEVEL_THRESHOLDS[nextIdx];
 }
 
 function getCurrentLevelXP(currentLevel: number): number {
-  const current = LEVEL_THRESHOLDS.find((t) => t.level === currentLevel);
-  return current?.xp ?? 0;
+  if (currentLevel < 0 || currentLevel >= LEVEL_THRESHOLDS.length) return 0;
+  return LEVEL_THRESHOLDS[currentLevel];
 }
 
 export default async function MisionesPage() {

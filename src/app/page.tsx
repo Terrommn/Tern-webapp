@@ -1,21 +1,7 @@
 import { AppIcon } from "@/components/ui/app-icon";
 import { AuthShell } from "@/components/steelflow/AuthShell";
 import { createClient } from "@/lib/supabase/server";
-
-const LEVEL_THRESHOLDS = [
-  { level: 1, xp: 0 },
-  { level: 2, xp: 200 },
-  { level: 3, xp: 500 },
-  { level: 4, xp: 1000 },
-  { level: 5, xp: 2000 },
-  { level: 6, xp: 3500 },
-  { level: 7, xp: 5500 },
-  { level: 8, xp: 8000 },
-  { level: 9, xp: 12000 },
-  { level: 10, xp: 17000 },
-  { level: 11, xp: 24000 },
-  { level: 12, xp: 33000 },
-];
+import { LEVEL_THRESHOLDS } from "@/lib/gamification";
 
 export default async function SteelFlowProDashboardPage() {
   const supabase = await createClient();
@@ -55,10 +41,13 @@ export default async function SteelFlowProDashboardPage() {
   const levelTitle = (currentLevelDef?.title_es ?? "Aprendiz") as string;
 
   const currentLevelXP =
-    LEVEL_THRESHOLDS.find((t) => t.level === currentLevel)?.xp ?? 0;
+    currentLevel >= 0 && currentLevel < LEVEL_THRESHOLDS.length
+      ? LEVEL_THRESHOLDS[currentLevel]
+      : 0;
   const nextLevelXP =
-    LEVEL_THRESHOLDS.find((t) => t.level === currentLevel + 1)?.xp ??
-    LEVEL_THRESHOLDS[LEVEL_THRESHOLDS.length - 1].xp;
+    currentLevel + 1 < LEVEL_THRESHOLDS.length
+      ? LEVEL_THRESHOLDS[currentLevel + 1]
+      : LEVEL_THRESHOLDS[LEVEL_THRESHOLDS.length - 1];
   const xpInLevel = Math.max(totalXP - currentLevelXP, 0);
   const xpNeeded = Math.max(nextLevelXP - currentLevelXP, 1);
   const levelProgressPct = Math.min(
