@@ -1,7 +1,6 @@
 "use client";
 
 import { AppIcon } from "@/components/ui/app-icon";
-import { ProgressCard } from "@/components/steelflow/ProgressCard";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
@@ -34,18 +33,8 @@ const NAV_ITEMS = [
   },
   {
     href: "/progreso",
-    label: "Mi Progreso",
-    icon: "trending_up",
-  },
-  {
-    href: "/misiones",
-    label: "Misiones",
-    icon: "menu_book",
-  },
-  {
-    href: "/desafios",
-    label: "Desafios",
-    icon: "local_fire_department",
+    label: "Gamificacion",
+    icon: "emoji_events",
   },
 ] as const;
 
@@ -160,7 +149,6 @@ export function SteelFlowShell({ children }: { children: React.ReactNode }) {
           </nav>
 
           <div className="mt-auto px-2 pt-6">
-            <ProgressCard level={3} titleEs="Tecnico de Fundicion" currentXP={620} nextLevelXP={1000} streakDays={7} isCollapsed={isCollapsed} />
             <div
               className={[
                 "mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900",

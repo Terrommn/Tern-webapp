@@ -1,7 +1,5 @@
 import { AppIcon } from "@/components/ui/app-icon";
 import { SteelFlowShell } from "@/components/steelflow/SteelFlowShell";
-import { SteelRings } from "@/components/steelflow/SteelRings";
-import { ChallengesCard } from "@/components/steelflow/ChallengesCard";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function SteelFlowProDashboardPage() {
@@ -141,13 +139,12 @@ export default async function SteelFlowProDashboardPage() {
           </div>
 
           {/* KPI Cards */}
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
             {[
               { label: "Orders", value: totalOrders, icon: "receipt_long" },
               { label: "Clients", value: totalClients, icon: "groups" },
               { label: "Products", value: totalProducts, icon: "inventory_2" },
               { label: "Total (T)", value: `${totalWeight.toFixed(1)}`, icon: "scale" },
-              { label: "Racha", value: "7 dias", icon: "local_fire_department" },
             ].map((kpi) => (
               <div
                 key={kpi.label}
@@ -338,10 +335,26 @@ export default async function SteelFlowProDashboardPage() {
 
         {/* Right Column: Sidebar */}
         <aside className="flex flex-col gap-6 lg:col-span-4">
-          {/* Steel Rings Widget */}
-          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <SteelRings flowCount={3} flowTarget={5} tonnageValue={28.5} tonnageTarget={50} reachCount={2} reachTarget={3} streakDays={7} />
-          </div>
+          {/* Gamification Summary */}
+          <a href="/progreso" className="block rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-colors hover:border-primary/30 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-primary/30">
+            <div className="flex items-center gap-3">
+              <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10">
+                <AppIcon className="text-xl text-primary" name="emoji_events" />
+              </div>
+              <div className="flex-1">
+                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Gamificacion</p>
+                <p className="text-sm font-bold text-slate-900 dark:text-white">Lv.3 Tecnico de Fundicion</p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs font-bold text-primary">620 XP</p>
+                <p className="text-[10px] text-slate-400">7 dias racha</p>
+              </div>
+            </div>
+            <div className="mt-3 h-1.5 w-full rounded-full bg-slate-100 dark:bg-slate-800">
+              <div className="h-full w-[62%] rounded-full bg-primary" />
+            </div>
+            <p className="mt-1 text-[10px] text-slate-400">620 / 1,000 XP para siguiente nivel</p>
+          </a>
 
           {/* Pallet Calculator Card */}
           <div className="relative overflow-hidden rounded-xl bg-primary p-6 text-white shadow-lg">
@@ -464,9 +477,6 @@ export default async function SteelFlowProDashboardPage() {
               )}
             </div>
           </div>
-
-          {/* Challenges Card */}
-          <ChallengesCard challenges={[]} />
 
           {/* Industrial Support Info */}
           <div className="flex items-center gap-3 rounded-xl border border-dashed border-slate-300 p-4 dark:border-slate-700">

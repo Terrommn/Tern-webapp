@@ -340,10 +340,6 @@ export function ProductsWorkspace({
             {linkedOrders}
           </p>
         </div>
-        <div className="steelflow-card-hover steelflow-card-hover--br rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-950">
-          <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">Mastery</p>
-          <p className="mt-3 text-sm font-bold text-primary">Product Specialist — Tier 1</p>
-        </div>
       </section>
 
       <section className="grid grid-cols-1 gap-8 xl:grid-cols-[minmax(0,1.4fr)_460px]">
