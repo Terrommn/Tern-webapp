@@ -37,11 +37,16 @@ export default async function SteelFlowProDashboardPage() {
     }
   }
   const maxDay = Math.max(...dayTotals, 1);
-  const dailyBars = dayLabels.map((label, i) => ({
-    label,
-    height: `${Math.round((dayTotals[i] / maxDay) * 100)}%`,
-    value: dayTotals[i],
-  }));
+  const dailyBars = dayLabels.map((label, i) => {
+    const value = dayTotals[i];
+    const raw = (value / maxDay) * 100;
+    const pct = value > 0 ? Math.max(raw, 8) : 0;
+    return {
+      label,
+      height: `${pct}%`,
+      value,
+    };
+  });
 
   // Previous week comparison placeholder
   const weightChangePercent = totalWeight > 0 ? "+12.5%" : "0%";
@@ -177,16 +182,19 @@ export default async function SteelFlowProDashboardPage() {
                   {weightChangePercent}
                 </span>
               </div>
-              <div className="flex h-48 items-end justify-between gap-2 pt-4">
+              <div className="flex h-48 gap-2 pt-4">
                 {dailyBars.map((bar) => (
                   <div
                     className="group flex flex-1 flex-col items-center gap-2"
                     key={bar.label}
+                    title={`${bar.label}: ${bar.value.toFixed(1)} t`}
                   >
-                    <div
-                      className="w-full rounded-t-lg bg-primary/20 transition-colors group-hover:bg-primary"
-                      style={{ height: bar.height || "2%" }}
-                    />
+                    <div className="flex w-full flex-1 items-end">
+                      <div
+                        className="w-full rounded-t-lg bg-primary/70 transition-colors group-hover:bg-primary"
+                        style={{ height: bar.height }}
+                      />
+                    </div>
                     <span className="text-[10px] font-bold text-slate-400">
                       {bar.label}
                     </span>
